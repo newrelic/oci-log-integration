@@ -63,6 +63,12 @@ variable "repository_name" {
   default     = "newrelic-logging-repo"
 }
 
+variable "function_name" {
+  type        = string
+  description = "The name of the function"
+  default     = "oci-logging-integrations"
+}
+
 variable "repository_version" {
   type        = string
   description = "The version of the repository for function image"
@@ -84,7 +90,6 @@ variable "license_key" {
 
 variable "newrelic_account_id" {
   type        = string
-  sensitive   = true
   description = "The New Relic account ID for sending logs to New Relic endpoints"
 }
 
@@ -101,5 +106,5 @@ variable "log_id" {
 variable "debug_enabled" {
   type        = string
   description = "Enable debug mode."
-  default     = "false"
+  default     = "FALSE"
 }

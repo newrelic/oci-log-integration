@@ -89,7 +89,7 @@ resource "oci_functions_function" "logs_function" {
 
   defined_tags  = {}
   freeform_tags = local.freeform_tags
-  image         = "${var.region}.ocir.io/${var.tenancy_namespace}/${var.repository_name}:${var.repository_version}"
+  image         = "${var.region}.ocir.io/${var.tenancy_namespace}/${var.repository_name}/${var.function_name}:${var.repository_version}"
 }
 
 #Resource for the service connector hub-1
