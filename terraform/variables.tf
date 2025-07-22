@@ -24,7 +24,7 @@ variable "function_app_name" {
 
 variable "function_app_shape" {
   type        = string
-  default     = "GENERIC_X86"
+  default     = "GENERIC_ARM"
   description = "The shape of the function application. The docker image should be built accordingly. Use ARM if using Oracle Resource manager stack"
 }
 
@@ -52,21 +52,21 @@ variable "region" {
 }
 
 # Log Forwarding Function Variables
-variable "tenancy-namespace" {
+variable "tenancy_namespace" {
   type        = string
   description = "The tenancy namespace where function image resides"
 }
 
-variable "repository-name" {
+variable "repository_name" {
   type        = string
   description = "The name of the repository for function image"
   default     = "newrelic-logging-repo"
 }
 
-variable "repository-version" {
-    type        = string
-    description = "The version of the repository for function image"
-    default     = "latest"
+variable "repository_version" {
+  type        = string
+  description = "The version of the repository for function image"
+  default     = "latest"
 }
 
 # Log Forwarding Function Custom Variables

@@ -89,7 +89,7 @@ resource "oci_functions_function" "logs_function" {
 
   defined_tags  = {}
   freeform_tags = local.freeform_tags
-  image         = "${var.region}.ocir.io/${var.tenancy-namespace}/${var.repository-name}:${var.repository-version}"
+  image         = "${var.region}.ocir.io/${var.tenancy_namespace}/${var.repository_name}:${var.repository_version}"
 }
 
 #Resource for the service connector hub-1
@@ -99,7 +99,7 @@ resource "oci_sch_service_connector" "nr_service_connector" {
   display_name   = var.connector_hub_name
 
   source {
-    kind = "logs"
+    kind = "logging"
     log_sources {
       compartment_id = var.compartment_ocid
       log_group_id   = var.log_group_id
