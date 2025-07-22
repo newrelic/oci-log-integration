@@ -1,0 +1,210 @@
+---
+title: "New Relic Log Integration for OCI"
+description: >
+  Forward logs from OCI Log Groups to New Relic using OCI Functions
+  and Service Connector Hub
+schemaVersion: 1.1.0
+version: "1.0.0"
+locale: "en"
+
+variableGroups:
+  - title: "Required Configuration"
+    visible: true
+    variables:
+      - compartment_ocid
+      - tenancy_ocid
+      - log_group_ocid
+      - log_ocid
+      - newrelic_ingest_key
+      - function_docker_image
+
+  - title: "Network Configuration"
+    visible: true
+    variables:
+      - create_new_vcn
+      - vcn_cidr_block
+      - subnet_cidr_block
+      - existing_subnet_ocid
+
+  - title: "Function Configuration"
+    visible: true
+    variables:
+      - function_memory_mb
+      - function_timeout_seconds
+      - newrelic_logs_endpoint
+
+  - title: "Advanced Options"
+    visible: true
+    variables:
+      - resource_prefix
+      - freeform_tags
+
+variables:
+  compartment_ocid:
+    type: oci:identity:compartment:id
+    title: "Target Compartment"
+    description: "Select the compartment where resources will be created"
+    required: true
+
+  tenancy_ocid:
+    type: oci:identity:tenancy:id
+    title: "Tenancy OCID"
+    description: "OCID of your OCI tenancy"
+    required: true
+
+  log_group_ocid:
+    type: string
+    title: "Log Group OCID"
+    description: "OCID of the existing Log Group to forward logs from"
+    required: true
+    pattern: "^ocid1\\.loggroup\\."
+
+  log_ocid:
+    type: string
+    title: "Log OCID"
+    description: "OCID of the existing Log to forward logs from"
+    required: true
+    pattern: "^ocid1\\.log\\."
+
+  newrelic_ingest_key:
+    type: password
+    title: "New Relic Ingest License Key"
+    description: "Your New Relic Ingest License Key (starts with NRII-)"
+    required: true
+    sensitive: true
+    minLength: 40
+    maxLength: 50
+
+  function_docker_image:
+    type: string
+    title: "Function Docker Image"
+    description: >
+      Docker image for the log forwarder function
+      (e.g., region.ocir.io/namespace/repo:tag)
+    required: true
+    default: >
+      iad.ocir.io/idfmbxeaoavl/hrai-container-repo/newrelic-log-forwarder:latest
+    pattern: "^[a-zA-Z0-9.-]+\\.ocir\\.io/.+"
+
+  create_new_vcn:
+    type: boolean
+    title: "Create New VCN"
+    description: "Create a new VCN and subnet, or use an existing subnet"
+    required: true
+    default: true
+
+  vcn_cidr_block:
+    type: string
+    title: "VCN CIDR Block"
+    description: "CIDR block for the new VCN"
+    default: "10.0.0.0/16"
+    pattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$"
+    visible:
+      and:
+        - variable: create_new_vcn
+          equals: true
+
+  subnet_cidr_block:
+    type: string
+    title: "Subnet CIDR Block"
+    description: "CIDR block for the new subnet"
+    default: "10.0.1.0/24"
+    pattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$"
+    visible:
+      and:
+        - variable: create_new_vcn
+          equals: true
+
+  existing_subnet_ocid:
+    type: oci:core:subnet:id
+    title: "Existing Subnet"
+    description: "Select an existing subnet to use for the function"
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+    visible:
+      and:
+        - variable: create_new_vcn
+          equals: false
+
+  function_memory_mb:
+    type: number
+    title: "Function Memory (MB)"
+    description: "Memory allocation for the function"
+    required: true
+    default: 256
+    minimum: 128
+    maximum: 3008
+
+  function_timeout_seconds:
+    type: number
+    title: "Function Timeout (seconds)"
+    description: "Timeout for function execution"
+    required: true
+    default: 30
+    minimum: 1
+    maximum: 300
+
+  newrelic_logs_endpoint:
+    type: string
+    title: "New Relic Logs Endpoint"
+    description: "New Relic Logs API endpoint URL"
+    required: true
+    default: "https://log-api.newrelic.com/log/v1"
+    pattern: "^https://.*"
+
+  resource_prefix:
+    type: string
+    title: "Resource Name Prefix"
+    description: "Prefix for all created resource names"
+    required: true
+    default: "newrelic-log-integration"
+    maxLength: 50
+
+  freeform_tags:
+    type: map
+    title: "Freeform Tags"
+    description: "Tags to apply to all resources"
+    default:
+      Purpose: "NewRelicLogIntegration"
+      Environment: "Production"
+
+outputs:
+  vcn_id:
+    type: copyableString
+    title: "VCN OCID"
+    description: "OCID of the VCN (if created)"
+
+  subnet_id:
+    type: copyableString
+    title: "Subnet OCID"
+    description: "OCID of the subnet used by the function"
+
+  function_application_id:
+    type: copyableString
+    title: "Functions Application OCID"
+    description: "OCID of the Functions Application"
+
+  function_id:
+    type: copyableString
+    title: "Function OCID"
+    description: "OCID of the log forwarder function"
+
+  function_invoke_endpoint:
+    type: copyableString
+    title: "Function Invoke Endpoint"
+    description: "Direct invoke endpoint for the function"
+
+  service_connector_id:
+    type: copyableString
+    title: "Service Connector OCID"
+    description: "OCID of the Service Connector Hub"
+
+  dynamic_group_id:
+    type: copyableString
+    title: "Dynamic Group OCID"
+    description: "OCID of the Dynamic Group for the function"
+
+  setup_complete:
+    type: string
+    title: "Setup Status"
+    description: "Confirmation message"

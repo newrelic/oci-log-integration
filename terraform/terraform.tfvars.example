@@ -1,0 +1,39 @@
+# Example terraform.tfvars file for New Relic Log Integration
+# Copy this file to terraform.tfvars and update with your actual values
+
+# Required Configuration
+compartment_ocid = "ocid1.compartment.oc1..aaaaaaaa..."
+tenancy_ocid     = "ocid1.tenancy.oc1..aaaaaaaa..."
+
+# Log Group to monitor (must exist)
+log_group_ocid = "ocid1.loggroup.oc1.iad.aaaaaaaa..."
+log_ocid ="fds"
+
+# New Relic Configuration
+newrelic_ingest_key = "NRII-your-newrelic-ingest-key-here"
+# newrelic_logs_endpoint = "https://log-api.newrelic.com/log/v1" # Optional: default is US endpoint
+
+# Function Docker Image (defaults to your image, but can be overridden)
+# function_docker_image = "iad.ocir.io/idfmbxeaoavl/hrai-container-repo/newrelic-log-forwarder:latest"
+
+# Network Configuration
+create_new_vcn = true  # Set to false if using existing subnet
+# vcn_cidr_block = "10.0.0.0/16"
+# subnet_cidr_block = "10.0.1.0/24"
+
+# If using existing subnet (when create_new_vcn = false)
+# existing_subnet_ocid = "ocid1.subnet.oc1.iad.aaaaaaaa..."
+
+# Function Configuration (optional - defaults provided)
+# function_memory_mb = 256
+# function_timeout_seconds = 30
+
+# Resource Naming (optional)
+# resource_prefix = "newrelic-log-integration"
+
+# Tags (optional)
+# freeform_tags = {
+#   "Purpose"     = "NewRelicLogIntegration"
+#   "Environment" = "Production"
+#   "Team"        = "Platform"
+# }

@@ -1,0 +1,9 @@
+schema_version: 20180708
+name: newrelic-log-forwarder
+version: 0.0.1
+runtime: go
+build_image: fnproject/go:1.21-dev
+run_image: fnproject/go:1.21
+entrypoint: ./func
+format: http-stream
+memory: 256
