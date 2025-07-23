@@ -1,105 +1,79 @@
-# OCI Log Integration with New Relic - Variables
-
-# Required Configuration
-variable "compartment_ocid" {
-  description = "OCID of the compartment where resources will be created"
-  type        = string
-}
-
 variable "tenancy_ocid" {
-  description = "OCID of the tenancy"
   type        = string
+  description = "OCI tenant OCID, more details can be found at https://docs.cloud.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#five"
 }
 
-variable "log_group_ocid" {
-  description = "OCID of the existing Log Group to forward logs from"
+variable "current_user_ocid" {
   type        = string
+  description = "The OCID of the current user executing the terraform script. Do not modify."
 }
 
-variable "log_ocid" {
-  description = "OCID of the existing Log to forward logs from"
+variable "compartment_ocid" {
   type        = string
+  description = "The OCID of the compartment where resources will be created."
 }
 
-
-variable "newrelic_ingest_key" {
-  description = "New Relic Ingest License Key"
+variable "region" {
   type        = string
-  sensitive   = true
+  description = "OCI Region as documented at https://docs.cloud.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm"
 }
 
-# Network Configuration
-variable "create_new_vcn" {
-  description = "Whether to create a new VCN or use an existing one"
-  type        = bool
-  default     = true
-}
-
-variable "vcn_cidr_block" {
-  description = "CIDR block for the VCN (only used if create_new_vcn is true)"
+variable "dynamic_group_name" {
   type        = string
-  default     = "10.0.0.0/16"
+  description = "The name of the dynamic group for giving access to service connector"
+  default     = "newrelic-logging-dynamic-group-hrai"
 }
 
-variable "subnet_cidr_block" {
-  description = "CIDR block for the subnet (only used if create_new_vcn is true)"
+variable "newrelic_logging_policy" {
   type        = string
-  default     = "10.0.1.0/24"
+  description = "The name of the policy for logging"
+  default     = "newrelic-logging-policy"
 }
 
-variable "existing_subnet_ocid" {
-  description = "OCID of existing subnet to use (only used if create_new_vcn is false)"
-  type        = string
-  default     = ""
-}
 
-# Function Configuration
-variable "function_docker_image" {
-  description = "Docker image for the log forwarder function (must be accessible from OCI Functions)"
-  type        = string
-  default     = "iad.ocir.io/idfmbxeaoavl/hrai-container-repo/newrelic-log-forwarder:latest"
-}
-
-variable "function_memory_mb" {
-  description = "Memory allocation for the function in MB"
-  type        = number
-  default     = 256
-  validation {
-    condition     = var.function_memory_mb >= 128 && var.function_memory_mb <= 3008
-    error_message = "Function memory must be between 128 and 3008 MB."
-  }
-}
-
-variable "function_timeout_seconds" {
-  description = "Timeout for the function in seconds"
-  type        = number
-  default     = 30
-  validation {
-    condition     = var.function_timeout_seconds >= 1 && var.function_timeout_seconds <= 300
-    error_message = "Function timeout must be between 1 and 300 seconds."
-  }
-}
-
-# New Relic Configuration
-variable "newrelic_logs_endpoint" {
-  description = "New Relic Logs API endpoint URL"
+variable "newrelic_logging_endpoint" {
   type        = string
   default     = "https://log-api.newrelic.com/log/v1"
+  description = "The endpoint to hit for sending the Logs. Varies by region [US|EU]"
 }
 
-# Resource Naming
-variable "resource_prefix" {
-  description = "Prefix for all resource names"
+variable "newrelic_api_key" {
   type        = string
-  default     = "newrelic-log-integration"
+  sensitive   = true
+  description = "The Ingest API key for sending Logs to New Relic endpoints"
 }
 
-# Tags
-variable "freeform_tags" {
-  description = "Freeform tags to apply to all resources"
-  type        = map(string)
-  default = {
-    "Purpose"     = "NewRelicLogIntegration"
-    "Environment" = "Production"
-  }
+variable "newrelic_account_id" {
+  type        = string
+  sensitive   = true
+  description = "The New Relic account ID for sending logging to New Relic endpoints"
+}
+
+variable "newrelic_function_app" {
+  type        = string
+  description = "The name of the function application"
+  default     = "newrelic-logging-function-app"
+}
+
+
+variable "connector_hub_name" {
+  type        = string
+  description = "The prefix for the name of all of the resources"
+  default     = "newrelic-logging-connector-hub"
+}
+
+variable "function_app_shape" {
+  type        = string
+  default     = "GENERIC_X86"
+  description = "The shape of the function application. The docker image should be built accordingly. Use ARM if using Oracle Resource manager stack"
+}
+
+variable "log_group_id" {
+  type        = string
+  description = "log group OCID to send logs to New Relic."
+}
+
+variable "log_id" {
+  type        = string
+  description = "log OCID to send logs to New Relic."
 }
