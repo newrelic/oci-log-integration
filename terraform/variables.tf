@@ -8,9 +8,9 @@ variable "current_user_ocid" {
   description = "The OCID of the current user executing the terraform script. Do not modify."
 }
 
-variable "compartment_ocid" {
+variable "compartment_name" {
   type        = string
-  description = "The OCID of the compartment where resources will be created."
+  description = "The name of the compartment where resources will be created."
 }
 
 variable "region" {
@@ -68,12 +68,12 @@ variable "function_app_shape" {
   description = "The shape of the function application. The docker image should be built accordingly. Use ARM if using Oracle Resource manager stack"
 }
 
-variable "log_group_id" {
+variable "log_group_name" {
   type        = string
-  description = "log group OCID to send logs to New Relic."
+  description = "log group name to send logs to New Relic."
 }
 
-variable "log_id" {
+variable "log_name" {
   type        = string
   description = "log OCID to send logs to New Relic."
 }

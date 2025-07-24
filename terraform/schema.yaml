@@ -54,10 +54,10 @@ variables:
     required: true
     visible: false
 
-  compartment_ocid:
-    type: oci:identity:compartment:id
-    title: "Compartment OCID"
-    description: "The OCID of the compartment where resources will be created."
+  compartment_name:
+    type: string
+    title: "Compartment Name"
+    description: "The name of the compartment where resources will be created."
     required: true
 
   dynamic_group_name:
@@ -125,17 +125,17 @@ variables:
       - "GENERIC_X86"
       - "GENERIC_ARM"
 
-  log_group_id:
+  log_group_name:
     type: string
-    title: "New Relic Log Group ID"
-    description: "The ID of the log group in New Relic"
+    title: "New Relic Log Group Name"
+    description: "The name of the log group in New Relic"
     required: true
     
 
-  log_id:
+  log_name:
     type: string
-    title: "New Relic Log ID"
-    description: "The ID of the log in New Relic"
+    title: "New Relic Log Name"
+    description: "The name of the log in New Relic"
     required: true
     
   

@@ -28,20 +28,86 @@ data "oci_identity_tenancy" "current_tenancy" {
   tenancy_id = var.tenancy_ocid
 }
 
+# Data source to find the target compartment by name.
+# It explicitly excludes the root compartment from its search by not setting
+# compartment_id to var.tenancy_ocid. Instead, it queries the sub-compartments.
+# We will use 'current_tenancy.name' to detect if 'compartment_name' refers to the root.
+
+data "oci_identity_compartments" "target_child_compartment" {
+
+  # Only try to find a child compartment if var.compartment_name is NOT the tenancy name.
+  count = var.compartment_name != data.oci_identity_tenancy.current_tenancy.name ? 1 : 0
+  
+  # Search within the root (tenancy) for the named child compartment
+  compartment_id = var.tenancy_ocid 
+  filter {
+    name   = "name"
+    values = [var.compartment_name]
+  }
+}
+
 
 locals {
+  # This crucial local determines the compartment_ocid for resource deployment.
+  # If var.compartment_name matches the tenancy's display name, use tenancy_ocid (root).
+  # Otherwise, attempt to find a child compartment by name.
+  # If no child compartment is found (length is 0), it implies an error or misconfiguration,
+  # but for robustness, we'll fall back to tenancy_ocid.
   
+  compartment_ocid = var.compartment_name == data.oci_identity_tenancy.current_tenancy.name ? var.tenancy_ocid : (
+    length(data.oci_identity_compartments.target_child_compartment) > 0 ? data.oci_identity_compartments.target_child_compartment[0].id : var.tenancy_ocid
+  )
+
+  log_group_compartment_ocid_for_lookup = local.compartment_ocid
+  # For log sources, if they might be in a different compartment than the deployed resources,
+  # you'd need a separate variable (e.g., var.log_group_compartment_ocid)
+  # For now, assuming log group is in the same compartment as other resources.
   freeform_tags = {
     newrelic-logging-terraform = "true"
   }
-  
-  
-  # Names for the network infra
+
   vcn_name        = "newrelic-logging-vcn"
   nat_gateway     = "${local.vcn_name}-natgateway"
   service_gateway = "${local.vcn_name}-servicegateway"
   subnet          = "${local.vcn_name}-public-subnet"
 }
+
+# Lookup log group OCID by name
+data "oci_logging_log_groups" "target" {
+  compartment_id = local.log_group_compartment_ocid_for_lookup  # Use the determined compartment
+  filter {
+    name   = "display_name"
+    values = [var.log_group_name]
+  }
+}
+
+
+
+
+
+
+locals {
+  log_group_ocid = data.oci_logging_log_groups.target.log_groups[0].id
+}
+
+# Lookup log OCID by name
+data "oci_logging_logs" "target" {
+  # Only attempt lookup if var.log_name is not empty
+  count = var.log_name != "" ? 1 : 0
+  log_group_id = local.log_group_ocid
+  filter {
+    name   = "display_name"
+    values = [var.log_name]
+  }
+}
+
+
+locals {
+  # If log_name was provided, get the log OCID; otherwise, it's null (meaning all logs in group)
+  log_ocid = var.log_name != "" ? data.oci_logging_logs.target[0].logs[0].id : null
+}
+
+
 
 #Resource for the dynamic group
 resource "oci_identity_dynamic_group" "nr_serviceconnector_group_hrai" {
@@ -62,7 +128,8 @@ resource "oci_identity_policy" "nr_logging_policy" {
   statements     = [
     "Allow dynamic-group ${var.dynamic_group_name} to read logs in tenancy",
     "Allow dynamic-group ${var.dynamic_group_name} to use fn-function in tenancy",
-    "Allow dynamic-group ${var.dynamic_group_name} to use fn-invocation in tenancy"
+    "Allow dynamic-group ${var.dynamic_group_name} to use fn-invocation in tenancy",
+    "Allow dynamic-group ${var.dynamic_group_name} to inspect log-groups in tenancy"
   ]
   defined_tags  = {}
   freeform_tags = local.freeform_tags
@@ -71,7 +138,7 @@ resource "oci_identity_policy" "nr_logging_policy" {
 #Resource for the function application
 resource "oci_functions_application" "logging_function_app" {
   depends_on     = [oci_identity_policy.nr_logging_policy]
-  compartment_id = var.compartment_ocid
+  compartment_id = local.compartment_ocid
   config = {
     "NEW_RELIC_LICENSE_KEY"  = var.newrelic_api_key
   }
@@ -95,13 +162,19 @@ resource "oci_functions_function" "logging_function" {
 
   defined_tags  = {}
   freeform_tags = local.freeform_tags
-  image         = "${var.region}.ocir.io/idfmbxeaoavl/hrai-container-repo/newrelic-log-forwarder:latest"
+  image         = "${var.region}.ocir.io/idms1yfytybe/oci-testing-registry/oci-function-x86:0.0.1"
 } 
+
+# hrai repo details 
+#image         = "${var.region}.ocir.io/idfmbxeaoavl/hrai-container-repo/newrelic-log-forwarder:latest"
+
+# idms1yfytybe  -> beyond-nr-1-account
+# oci-testing-registry/oci-function-x86:0.0.1
 
 #Resource for the service connector hub-1
 resource "oci_sch_service_connector" "nr_service_connector" {
   depends_on     = [oci_functions_function.logging_function]
-  compartment_id = var.compartment_ocid
+  compartment_id = local.compartment_ocid
   display_name   = var.connector_hub_name
 
   # Source Configuration with Logging
@@ -109,9 +182,9 @@ resource "oci_sch_service_connector" "nr_service_connector" {
     kind = "logging"
 
     log_sources {
-      compartment_id = var.compartment_ocid
-      log_group_id   = var.log_group_id
-      log_id         = var.log_id
+      compartment_id = local.log_group_compartment_ocid_for_lookup
+      log_group_id   = local.log_group_ocid
+      log_id         = local.log_ocid
     }
   }
 
@@ -123,7 +196,7 @@ resource "oci_sch_service_connector" "nr_service_connector" {
     #Optional
     batch_size_in_kbs = 100
     batch_time_in_sec = 60
-    compartment_id    = var.compartment_ocid
+    compartment_id    = local.compartment_ocid
     function_id       = oci_functions_function.logging_function.id
   }
 
@@ -138,7 +211,7 @@ module "vcn" {
   source                   = "oracle-terraform-modules/vcn/oci"
   version                  = "3.6.0"
   count                    = 1
-  compartment_id           = var.compartment_ocid
+  compartment_id           = local.compartment_ocid
   defined_tags             = {}
   freeform_tags            = local.freeform_tags
   vcn_cidrs                = ["10.0.0.0/16"]
@@ -162,7 +235,7 @@ module "vcn" {
 
 data "oci_core_route_tables" "default_vcn_route_table" {
   depends_on     = [module.vcn] # Ensure VCN is created before attempting to find its route tables
-  compartment_id = var.compartment_ocid
+  compartment_id = local.compartment_ocid
   vcn_id         = module.vcn[0].vcn_id # Get the VCN ID from the module output
 
   filter {
