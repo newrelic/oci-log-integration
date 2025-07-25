@@ -11,7 +11,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"encoding/base64"
+	"fmt"
 
+	"github.com/oracle/oci-go-sdk/v65/common"
+	"github.com/oracle/oci-go-sdk/v65/secrets"
+	"github.com/oracle/oci-go-sdk/v65/common/auth"
 	"github.com/fnproject/fdk-go"
 )
 
@@ -64,14 +69,81 @@ func main() {
 	fdk.Handle(fdk.HandlerFunc(handleFunction))
 }
 
+func fetchAPIKeyFromVault(secretOCID, vaultRegion string) (string, error) {
+	// Create a context for the API call.
+	ctx := context.Background()
+
+	var provider common.ConfigurationProvider
+	var err error
+
+	provider, err = auth.InstancePrincipalConfigurationProvider()
+	// 2. Create a SecretsClient using the Instance Principals provider.
+	secretsClient, err := secrets.NewSecretsClientWithConfigurationProvider(provider)
+	if err != nil {
+		log.Printf("ERROR: Failed to create SecretsClient: %v", err)
+		return "", fmt.Errorf("failed to create SecretsClient: %w", err)
+	}
+
+	// 3. Set the region for the SecretsClient.
+	// Removed the incomplete line 'secretsClient.Set'
+	secretsClient.SetRegion(vaultRegion)
+
+	// 4. Set retry policy (OCI Go SDK clients often have a default, but you can customize).
+	// For simplicity, we'll rely on the SDK's default retry behavior or add a basic one.
+	// The common.WithRetryPolicy option can be used during client creation if a custom policy is needed.
+	// Example of custom retry (can be added to NewSecretsClientWithConfigurationProvider options):
+	// secretsClient.SetCustomRetryConfiguration(common.NewRetryConfigurationWithMaxAttempts(3))
+
+	// 5. Fetch the secret bundle.
+	getSecretBundleRequest := secrets.GetSecretBundleRequest{
+		SecretId: common.String(secretOCID),
+	}
+
+	scResponse, err := secretsClient.GetSecretBundle(ctx, getSecretBundleRequest)
+	if err != nil {
+		log.Printf("ERROR: Failed to fetch secret bundle for OCID %s: %v", secretOCID, err)
+		return "", fmt.Errorf("failed to fetch secret bundle: %w", err)
+	}
+
+	// 6. Extract and decode the secret content.
+	// The secret_bundle_content is an interface, so we need to type assert it.
+	secretContent, ok := scResponse.SecretBundleContent.(secrets.Base64SecretBundleContentDetails)
+	if !ok {
+		log.Printf("ERROR: Unexpected secret content type for OCID %s", secretOCID)
+		return "", fmt.Errorf("unexpected secret content type")
+	}
+
+	if secretContent.Content == nil {
+		log.Printf("ERROR: Secret content is nil for OCID %s", secretOCID)
+		return "", fmt.Errorf("secret content is nil")
+	}
+
+	decodedSecret, err := base64.StdEncoding.DecodeString(*secretContent.Content)
+	if err != nil {
+		log.Printf("ERROR: Failed to base64 decode secret content for OCID %s: %v", secretOCID, err)
+		return "", fmt.Errorf("failed to decode secret content: %w", err)
+	}
+
+	return string(decodedSecret), nil
+}
+
 // handleFunction processes the incoming OCI Audit Log events and sends them to New Relic.
 func handleFunction(ctx context.Context, in io.Reader, out io.Writer) {
 	// Retrieve New Relic License Key from environment variables.
 	// In a production environment, this should be securely managed (e.g., OCI Vault).
 	// For demonstration, a placeholder key is used.
-	newRelicLicenseKey := os.Getenv("NEW_RELIC_LICENSE_KEY")
-	if newRelicLicenseKey == "" {
-		log.Println("Error: NEW_RELIC_LICENSE_KEY environment variable not set")
+	// newRelicLicenseKey := os.Getenv("NEW_RELIC_LICENSE_KEY")
+	// if newRelicLicenseKey == "" {
+	// 	log.Println("Error: NEW_RELIC_LICENSE_KEY environment variable not set")
+	// 	return
+	// }
+
+	vaultRegion := os.Getenv("VAULT_REGION")
+	secretOCID := os.Getenv("SECRET_OCID")
+
+	newRelicLicenseKey, err := fetchAPIKeyFromVault(secretOCID, vaultRegion);
+	if err != nil {
+		log.Printf("Error fetching New Relic License Key from Vault: %v\n", err)
 		return
 	}
 
