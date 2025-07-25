@@ -71,9 +71,8 @@ func handleFunction(ctx context.Context, in io.Reader, out io.Writer) {
 	// For demonstration, a placeholder key is used.
 	newRelicLicenseKey := os.Getenv("NEW_RELIC_LICENSE_KEY")
 	if newRelicLicenseKey == "" {
-		// Fallback for testing/development if env var is not set
-		newRelicLicenseKey = "3fbf0ba82bf417b4430ee8880372ea4aFFFFNRAL"
-		log.Println("Warning: NEW_RELIC_LICENSE_KEY environment variable not set, using placeholder.")
+		log.Println("Error: NEW_RELIC_LICENSE_KEY environment variable not set")
+		return
 	}
 
 	// Retrieve New Relic Region from environment variables.
