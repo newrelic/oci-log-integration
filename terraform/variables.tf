@@ -8,11 +8,6 @@ variable "current_user_ocid" {
   description = "The OCID of the current user executing the terraform script. Do not modify."
 }
 
-variable "compartment_name" {
-  type        = string
-  description = "The name of the compartment where resources will be created."
-}
-
 variable "region" {
   type        = string
   description = "OCI Region as documented at https://docs.cloud.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm"
@@ -59,7 +54,7 @@ variable "newrelic_function_app" {
 variable "connector_hub_name" {
   type        = string
   description = "The prefix for the name of all of the resources"
-  default     = "newrelic-logging-connector-hub"
+  default     = "newrelic-logging-connector-hub-hrai"
 }
 
 variable "function_app_shape" {
@@ -68,12 +63,11 @@ variable "function_app_shape" {
   description = "The shape of the function application. The docker image should be built accordingly. Use ARM if using Oracle Resource manager stack"
 }
 
-variable "log_group_name" {
-  type        = string
-  description = "log group name to send logs to New Relic."
-}
-
-variable "log_name" {
-  type        = string
-  description = "log OCID to send logs to New Relic."
+variable "log_sources" {
+  type = list(object({
+    compartment_name = string
+    log_group_name   = string
+    log_name         = string
+  }))
+  description = "List of log sources to onboard. Each can be from different compartments."
 }

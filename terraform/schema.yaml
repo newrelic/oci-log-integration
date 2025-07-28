@@ -13,7 +13,6 @@ variableGroups:
     variables:
       - tenancy_ocid
       - current_user_ocid
-      - compartment_ocid
       - region
 
   - title: "New Relic Environment Configuration"
@@ -54,7 +53,7 @@ variables:
     required: true
     visible: false
 
-  compartment_name:
+  root_compartment_name:
     type: string
     title: "Compartment Name"
     description: "The name of the compartment where resources will be created."
@@ -124,17 +123,25 @@ variables:
       - "GENERIC_X86"
       - "GENERIC_ARM"
 
-  log_group_name:
-    type: string
-    title: "New Relic Log Group Name"
-    description: "The name of the log group in New Relic"
+  log_sources:
+    type: array
+    title: "Log Sources"
+    description: "List of log sources to onboard from various compartments"
     required: true
-    
-
-  log_name:
-    type: string
-    title: "New Relic Log Name"
-    description: "The name of the log in New Relic"
-    required: true
+    items:
+      type: object
+      properties:
+        compartment_name:
+          type: string
+          title: "Source Compartment Name"
+          required: true
+        log_group_name:
+          type: string
+          title: "Log Group Name"
+          required: true
+        log_name:
+          type: string
+          title: "Log Name"
+          required: true
     
   
