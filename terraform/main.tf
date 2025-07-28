@@ -28,40 +28,14 @@ data "oci_identity_tenancy" "current_tenancy" {
   tenancy_id = var.tenancy_ocid
 }
 
-# Data source to find the target compartment by name.
-# It explicitly excludes the root compartment from its search by not setting
-# compartment_id to var.tenancy_ocid. Instead, it queries the sub-compartments.
-# We will use 'current_tenancy.name' to detect if 'compartment_name' refers to the root.
-
-data "oci_identity_compartments" "target_child_compartment" {
-
-  # Only try to find a child compartment if var.compartment_name is NOT the tenancy name.
-  count = var.compartment_name != data.oci_identity_tenancy.current_tenancy.name ? 1 : 0
-  
-  # Search within the root (tenancy) for the named child compartment
-  compartment_id = var.tenancy_ocid 
-  filter {
-    name   = "name"
-    values = [var.compartment_name]
-  }
-}
 
 
 locals {
-  # This crucial local determines the compartment_ocid for resource deployment.
-  # If var.compartment_name matches the tenancy's display name, use tenancy_ocid (root).
-  # Otherwise, attempt to find a child compartment by name.
-  # If no child compartment is found (length is 0), it implies an error or misconfiguration,
-  # but for robustness, we'll fall back to tenancy_ocid.
-  
-  compartment_ocid = var.compartment_name == data.oci_identity_tenancy.current_tenancy.name ? var.tenancy_ocid : (
-    length(data.oci_identity_compartments.target_child_compartment) > 0 ? data.oci_identity_compartments.target_child_compartment[0].id : var.tenancy_ocid
-  )
+
+  compartment_ocid = var.tenancy_ocid
 
   log_group_compartment_ocid_for_lookup = local.compartment_ocid
-  # For log sources, if they might be in a different compartment than the deployed resources,
-  # you'd need a separate variable (e.g., var.log_group_compartment_ocid)
-  # For now, assuming log group is in the same compartment as other resources.
+
   freeform_tags = {
     newrelic-logging-terraform = "true"
   }
