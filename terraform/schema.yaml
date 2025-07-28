@@ -90,7 +90,6 @@ variables:
     description: "The Ingest API key for sending logs to New Relic endpoints"
     required: true
     sensitive: true
-    confirmation: true
 
   newrelic_account_id:
     type: string
