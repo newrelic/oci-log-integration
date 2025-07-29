@@ -16,6 +16,11 @@ variable "compartment_ocid" {
 }
 
 # OCI Logging Integration Resource Variables
+variable "subnet_id" {
+  type        = string
+  description = "Subnet OCID for the function application"
+}
+
 variable "function_app_name" {
   type        = string
   description = "The name of the function application"
@@ -80,12 +85,6 @@ variable "nr_region" {
   type        = string
   description = "New Relic Region to forward Logs to. Valid values are 'US' or 'EU'."
   default = "US"
-}
-
-variable "license_key" {
-  type        = string
-  sensitive   = true
-  description = "License Key to ingest logs"
 }
 
 variable "newrelic_account_id" {
