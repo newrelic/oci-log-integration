@@ -48,7 +48,7 @@ locals {
 # This uses for_each to iterate over the provided log_sources.
 data "oci_identity_compartments" "log_source_compartments" {
   for_each = {
-    for idx, source in var.log_sources : idx => source
+    for idx, source in jsondecode(var.log_sources) : idx => source
     # Only run this data source if the compartment name is NOT the tenancy name
     if source.compartment_name != data.oci_identity_tenancy.current_tenancy.name
   }
@@ -64,7 +64,7 @@ data "oci_identity_compartments" "log_source_compartments" {
 
 # Lookup log group OCID by name for EACH log source
 data "oci_logging_log_groups" "log_source_groups" {
-  for_each = { for idx, source in var.log_sources : idx => source }
+  for_each = { for idx, source in jsondecode(var.log_sources) : idx => source }
 
   # Dynamically determine the compartment_id for the log group:
   # If the compartment_name matches the tenancy's display name, use tenancy_ocid directly.
@@ -80,7 +80,7 @@ data "oci_logging_log_groups" "log_source_groups" {
 
 # Lookup log OCID by name for EACH log source (if log_name is provided)
 data "oci_logging_logs" "log_source_logs" {
-  for_each = { for idx, source in var.log_sources : idx => source if source.log_name != "" } # Only lookup if log_name is not empty
+  for_each = { for idx, source in jsondecode(var.log_sources) : idx => source if source.log_name != "" } # Only lookup if log_name is not empty
 
   # Use the dynamically found log group OCID for this specific log source
   log_group_id = data.oci_logging_log_groups.log_source_groups[each.key].log_groups[0].id
@@ -231,7 +231,7 @@ resource "oci_sch_service_connector" "nr_service_connector" {
 
     # Create a log_sources block for each log source
     dynamic "log_sources" {
-      for_each = var.log_sources
+      for_each = jsondecode(var.log_sources)
       content {
         # Use the correct compartment resolution logic
         compartment_id = log_sources.value.compartment_name == data.oci_identity_tenancy.current_tenancy.name ? var.tenancy_ocid : data.oci_identity_compartments.log_source_compartments[log_sources.key].compartments[0].id

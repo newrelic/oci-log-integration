@@ -64,10 +64,6 @@ variable "function_app_shape" {
 }
 
 variable "log_sources" {
-  type = list(object({
-    compartment_name = string
-    log_group_name   = string
-    log_name         = string
-  }))
-  description = "List of log sources to onboard. Each can be from different compartments."
+  type        = string
+  description = "JSON string representing a list of log sources to onboard. Each can be from different compartments."
 }

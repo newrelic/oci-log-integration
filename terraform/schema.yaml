@@ -53,12 +53,6 @@ variables:
     required: true
     visible: false
 
-  root_compartment_name:
-    type: string
-    title: "Compartment Name"
-    description: "The name of the compartment where resources will be created."
-    required: true
-
   dynamic_group_name:
     type: string
     title: "New Relic Dynamic Group Name"
@@ -124,24 +118,7 @@ variables:
       - "GENERIC_ARM"
 
   log_sources:
-    type: array
-    title: "Log Sources"
-    description: "List of log sources to onboard from various compartments"
+    type: string
+    title: "Log Sources (JSON Array)"
+    description: "Enter a JSON string array of log sources. Example: [{\"compartment_name\":\"Comp1\",\"log_group_name\":\"Group1\",\"log_name\":\"Log1\"},{\"compartment_name\":\"Comp2\",\"log_group_name\":\"Group2\",\"log_name\":\"Log2\"}]"
     required: true
-    items:
-      type: object
-      properties:
-        compartment_name:
-          type: string
-          title: "Source Compartment Name"
-          required: true
-        log_group_name:
-          type: string
-          title: "Log Group Name"
-          required: true
-        log_name:
-          type: string
-          title: "Log Name"
-          required: true
-    
-  
