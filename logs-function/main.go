@@ -73,8 +73,6 @@ func handleFunction(ctx context.Context, in io.Reader, out io.Writer) {
 		return
 	}
 
-	// log.Printf("Incoming JSON Payload:\n%s\n", string(payloadBytes))
-
 	var incomingLogEvents []IncomingLoggingEvent
 	if err := json.Unmarshal(payloadBytes, &incomingLogEvents); err != nil {
 		log.Printf("Error decoding incoming log events payload: %v\n", err)
