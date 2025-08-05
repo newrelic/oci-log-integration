@@ -13,22 +13,21 @@ variableGroups:
     variables:
       - tenancy_ocid
       - current_user_ocid
-      - region
+      - newrelic_region
 
   - title: "New Relic Environment Configuration"
     visible: true
     variables:
       - newrelic_logging_endpoint
-      - newrelic_api_key
-      - newrelic_account_id
+      - label_prefix
 
   - title: "Resource Configuration"
     visible: true
     variables:
-      - dynamic_group_name
+      - newrelic_dynamic_group_name
       - newrelic_logging_policy
       - newrelic_function_app
-      - connector_hub_name
+      - newrelic_connector_hub_name
       - function_app_shape
 
 variables:
@@ -46,14 +45,14 @@ variables:
     required: true
     visible: false
 
-  region:
+  newrelic_region:
     type: string
     title: "Region"
     description: "OCI Region as documented at https://docs.cloud.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm"
     required: true
     visible: false
 
-  dynamic_group_name:
+  newrelic_dynamic_group_name:
     type: string
     title: "New Relic Dynamic Group Name"
     description: "The name of the dynamic group for giving access to service connector"
@@ -77,21 +76,6 @@ variables:
       - "https://log-api.newrelic.com/log/v1"
       - "https://log-api.eu.newrelic.com/log/v1"
 
-  newrelic_api_key:
-    type: password
-    title: "New Relic API Key"
-    description: "The Ingest API key for sending logs to New Relic endpoints"
-    required: true
-    sensitive: true
-
-  newrelic_account_id:
-    type: string
-    title: "New Relic Account ID"
-    description: "The New Relic account ID for sending logging to New Relic endpoints"
-    required: true
-    sensitive: true
-    confirmation: true
-
   newrelic_function_app:
     type: string
     title: "New Relic Function App Name"
@@ -99,12 +83,12 @@ variables:
     required: true
     default: "newrelic-logging-function-app"
 
-  connector_hub_name:
+  newrelic_connector_hub_name:
     type: string
     title: "New Relic Connector Hub Name"
     description: "The prefix for the name of all of the resources"
     required: true
-    default: "newrelic-logging-connector-hub"
+    default: "newrelic-connector-hub"
 
   function_app_shape:
     type: enum
@@ -119,6 +103,6 @@ variables:
 
   log_sources:
     type: string
-    title: "Log Sources (JSON Array)"
+    title: "Log Sources (JSON String Array)"
     description: "Enter a JSON string array of log sources. Example: [{\"compartment_name\":\"Comp1\",\"log_group_name\":\"Group1\",\"log_name\":\"Log1\"},{\"compartment_name\":\"Comp2\",\"log_group_name\":\"Group2\",\"log_name\":\"Log2\"}]"
     required: true
