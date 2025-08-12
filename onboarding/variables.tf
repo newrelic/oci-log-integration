@@ -14,15 +14,3 @@ variable "region" {
   type        = string
   default     = "us-ashburn-1"
 }
-
-variable "deploy_metrics" {
-  description = "Flag to deploy the New Relic metrics integration."
-  type        = bool
-  default     = true
-}
-
-variable "deploy_logs" {
-  description = "Flag to deploy the New Relic logs integration."
-  type        = bool
-  default     = true
-}
