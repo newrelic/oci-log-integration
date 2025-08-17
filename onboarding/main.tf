@@ -34,7 +34,6 @@ locals {
       createdAt
       disabled
       externalId
-      metricCollectionMode
       name
       nrAccountId
       updatedAt
