@@ -6,11 +6,32 @@ variable "tenancy_ocid" {
 variable "compartment_ocid" {
   description = "The OCID of the compartment where resources will be created."
   type        = string
-  default     = "ocid1.compartment.oc1..your_compartment_ocid"
 }
 
 variable "region" {
   description = "The home region where the vault and policies will be created."
   type        = string
   default     = "us-ashburn-1"
+}
+
+variable "new_relic_tenancy_ocid" {
+  description = "The OCID of the New Relic tenancy to which access will be granted."
+  type        = string
+}
+
+variable "new_relic_group_ocid" {
+  description = "The OCID of the New Relic group that will be granted access."
+  type        = string
+}
+
+variable "newrelic_account_id" {
+  type        = string
+  sensitive   = true
+  description = "The New Relic account ID for sending metrics to New Relic endpoints"
+}
+
+variable "newrelic_user_api_key" {
+  type        = string
+  sensitive   = true
+  description = "The User API key for Linking the OCI Account to the New Relic account"
 }

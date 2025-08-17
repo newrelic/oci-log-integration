@@ -1,0 +1,69 @@
+title: New Relic Policy Setup
+name: newrelic-stack-setup
+description: This is used to configure the New Relic Dynamic Group, Policies, and Link to the Newrelic Account.
+schemaVersion: 1.1.0
+version: 1.0
+locale: "en"
+groupings:
+  - title: "OCI Account Configuration"
+    variables:
+      - ${tenancy_ocid}
+      - ${compartment_ocid}
+      - ${region}
+  - title: "New Relic Environment Configuration"
+    variables:
+      - ${new_relic_tenancy_ocid}
+      - ${new_relic_group_ocid}
+      - ${newrelic_account_id}
+      - ${newrelic_user_api_key}
+
+variables:
+  tenancy_ocid:
+    type: string
+    title: Tenancy OCID
+    description: OCI tenant OCID, more details can be found at https://docs.cloud.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#five
+    required: true
+    visible: true
+
+  compartment_ocid:
+    type: string
+    title: Compartment OCID
+    description: The OCID of the compartment where the resources will be created.
+    required: true
+    visible: false
+
+  region:
+    type: string
+    title: Region
+    description: OCI Region as documented at https://docs.cloud.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm
+    required: true
+    visible: false
+
+  new_relic_tenancy_ocid:
+    type: string
+    title: New Relic Tenancy OCID
+    description: The OCID of the New Relic tenancy to which access will be granted.
+    required: true
+
+  new_relic_group_ocid:
+    type: string
+    title: New Relic Group OCID
+    description: The OCID of the New Relic group that will be granted access.
+    required: true
+
+  newrelic_account_id:
+    type: string
+    title: New Relic Account ID
+    description: The New Relic Account ID for linking the OCI account to the New Relic account
+    required: true
+    sensitive: true
+    confirmation: true
+
+  newrelic_user_api_key:
+    type: string
+    title: New Relic User API Key
+    description: The User API key for Linking the OCI Account to the New Relic account
+    required: true
+    sensitive: true
+    password: true
+    confirmation: true

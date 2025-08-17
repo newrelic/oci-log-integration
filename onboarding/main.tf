@@ -1,12 +1,48 @@
-locals {
-  new_relic_tenancy_ocid = "ocid1.tenancy.oc1..aaaaaaaaslaq5synueyzouxaimk3szzf66iw6od7xyiam5myn4lqhcsfu5fq"
-  new_relic_group_ocid   = "ocid1.group.oc1..aaaaaaaah3b2eubgfb67oehl56g7axbqtwkorprfsjktotvacjsqkyyt2pfq"
+terraform {
+  required_version = ">= 1.2.0"
+  required_providers {
+    oci = {
+      source  = "oracle/oci"
+      version = "5.46.0"
+    }
+  }
 }
 
-# ---------------------------------------------------------------------------------------------------------------------
-# Customer Onboarding (Secret Vault, Dynamic Groups and Policies Creation)
-# ---------------------------------------------------------------------------------------------------------------------
-# These resources are deployed regardless of which (metrics, logs) integration the customer chooses.
+provider "oci" {
+  tenancy_ocid = var.tenancy_ocid
+  region       = var.region
+}
+
+locals {
+  newrelic_graphql_endpoint = "https://api.newrelic.com/graphql"
+  linkAccount_graphql_query = <<EOF
+   mutation {
+    cloudLinkAccount(
+    accountId: ${var.newrelic_account_id},
+    accounts: {oci: {name: "nr_oci", tenantId: "${var.tenancy_ocid}"}}
+  ) {
+    errors {
+      linkedAccountId
+      providerSlug
+      message
+      nrAccountId
+      type
+    }
+    linkedAccounts {
+      id
+      authLabel
+      createdAt
+      disabled
+      externalId
+      metricCollectionMode
+      name
+      nrAccountId
+      updatedAt
+    }
+  }
+}
+  EOF
+}
 
 # Cross-Tenancy New Relic Read-Only Access Policy
 resource "oci_identity_policy" "cross_tenancy_read_only_policy" {
@@ -14,8 +50,8 @@ resource "oci_identity_policy" "cross_tenancy_read_only_policy" {
   name           = "New_Relic_Cross_Tenancy_Read_Only_Policy"
   description    = "Policy granting New Relic tenancy read-only access to connector hubs, VCNs, and log groups."
   statements     = [
-    "Define tenancy NRTenancyAlias as ${local.new_relic_tenancy_ocid}",
-    "Define group NRCustomerOCIAccessGroupAlias as ${local.new_relic_group_ocid}",
+    "Define tenancy NRTenancyAlias as ${var.new_relic_tenancy_ocid}",
+    "Define group NRCustomerOCIAccessGroupAlias as ${var.new_relic_group_ocid}",
     "Admit group NRCustomerOCIAccessGroupAlias of tenancy NRTenancyAlias to read virtual-network-family in tenancy",
     "Admit group NRCustomerOCIAccessGroupAlias of tenancy NRTenancyAlias to read log-content in tenancy",
     # "Admit group NRCustomerOCIAccessGroupAlias of tenancy NRTenancyAlias to read service-connector-hub-family in tenancy",
@@ -57,34 +93,39 @@ resource "oci_identity_policy" "functions_vault_access_policy" {
   ]
 }
 
+# Resource to link the New Relic account and configure the integration
+resource "null_resource" "newrelic_link_account" {
+  provisioner "local-exec" {
+    command = <<EOT
+      # Main execution for cloudLinkAccount
+      response=$(curl --silent --request POST \
+        --url "${local.newrelic_graphql_endpoint}" \
+        --header "API-Key: ${var.newrelic_user_api_key}" \
+        --header "Content-Type: application/json" \
+        --header "User-Agent: insomnia/11.1.0" \
+        --data '${jsonencode({
+          query = local.linkAccount_graphql_query
+        })}')
 
-# ---------------------------------------------------------------------------------------------------------------------
-# Conditional Metrics Module
-# ---------------------------------------------------------------------------------------------------------------------
-# This module is sourced from the metrics team's S3 bucket.
-# The 'count' meta-argument is used to conditionally deploy the module.
+      # Log the full response for debugging
+      echo "Full Response: $response"
 
-# module "new_relic_metrics" {
-#   count  = var.deploy_metrics ? 1 : 0
-  # source = local.metrics_template_s3_url
+      # Extract errors from the response
+      root_errors=$(echo "$response" | jq -r '.errors[]?.message // empty')
+      account_errors=$(echo "$response" | jq -r '.data.cloudLinkAccount.errors[]?.message // empty')
 
-  # Pass variables from the wrapper to the metrics module.
-  # The module's variables.tf must accept these inputs.
-  # tenancy_ocid         = var.tenancy_ocid
-  # compartment_ocid     = var.compartment_ocid
-# }
+      # Combine errors
+      errors="$root_errors"$'\n'"$account_errors"
 
-# ---------------------------------------------------------------------------------------------------------------------
-# Conditional Logs Module
-# ---------------------------------------------------------------------------------------------------------------------
-# This module is sourced from the logs team's S3 bucket.
+      # Check if errors exist
+      if [ -n "$errors" ] && [ "$errors" != $'\n' ]; then
+        echo "Operation failed with the following errors:" >&2
+        echo "$errors" | while IFS= read -r error; do
+          echo "- $error" >&2
+        done
+        exit 1
+      fi
 
-# module "new_relic_logs" {
-#   count  = var.deploy_logs ? 1 : 0
-  # source = var.logs_template_s3_url
-
-  # Pass variables from the wrapper to the logs module.
-  # The module's variables.tf must accept these inputs.
-  # tenancy_ocid         = var.tenancy_ocid
-  # compartment_ocid     = var.compartment_ocid
-# }
+    EOT
+  }
+}
