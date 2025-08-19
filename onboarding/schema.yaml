@@ -16,6 +16,7 @@ groupings:
       - ${new_relic_group_ocid}
       - ${newrelic_account_id}
       - ${newrelic_user_api_key}
+      - ${newrelic_ingest_api_key}
 
 variables:
   tenancy_ocid:
@@ -63,6 +64,15 @@ variables:
     type: string
     title: New Relic User API Key
     description: The User API key for Linking the OCI Account to the New Relic account
+    required: true
+    sensitive: true
+    password: true
+    confirmation: true
+
+  newrelic_ingest_api_key:
+    type: string
+    title: New Relic Ingest API Key
+    description: The Ingest API Key for sending logs to New Relic endpoints
     required: true
     sensitive: true
     password: true

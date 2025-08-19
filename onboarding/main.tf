@@ -131,7 +131,7 @@ resource "null_resource" "newrelic_link_account" {
 
 resource "oci_kms_vault" "newrelic_vault" {
   compartment_id = var.compartment_ocid
-  display_name   = var.kms_vault_name
+  display_name   = "newrelic-vault"
   vault_type     = "DEFAULT"
 }
 
