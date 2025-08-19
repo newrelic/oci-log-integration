@@ -15,14 +15,7 @@ type Common struct {
 }
 
 // LogData represents a collection of log records.
-type LogData []Log
-
-// Log represents a single log record.
-type Log struct {
-	Timestamp  string        `json:"timestamp"`  // Optional : If not timestamp is present per log and also in the common attribute then the log ingestion time is used
-	Attributes LogAttributes `json:"attributes"` // Optional
-	Log        string        `json:"log"`        // Required
-}
+type LogData []map[string]interface{}
 
 // LogAttributes represents the attributes of a log record.
 type LogAttributes map[string]interface{}
