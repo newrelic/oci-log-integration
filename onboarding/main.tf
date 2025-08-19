@@ -51,9 +51,8 @@ resource "oci_identity_policy" "cross_tenancy_read_only_policy" {
   statements     = [
     "Define tenancy NRTenancyAlias as ${var.new_relic_tenancy_ocid}",
     "Define group NRCustomerOCIAccessGroupAlias as ${var.new_relic_group_ocid}",
-    "Admit group NRCustomerOCIAccessGroupAlias of tenancy NRTenancyAlias to read virtual-network-family in tenancy",
     "Admit group NRCustomerOCIAccessGroupAlias of tenancy NRTenancyAlias to read log-content in tenancy",
-    # "Admit group NRCustomerOCIAccessGroupAlias of tenancy NRTenancyAlias to read service-connector-hub-family in tenancy",
+    "Admit group NRCustomerOCIAccessGroupAlias of tenancy NRTenancyAlias to inspect compartments in tenancy"
   ]
 }
 
