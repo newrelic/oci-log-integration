@@ -128,3 +128,32 @@ resource "null_resource" "newrelic_link_account" {
     EOT
   }
 }
+
+resource "oci_kms_vault" "newrelic_vault" {
+  compartment_id = var.compartment_ocid
+  display_name   = var.kms_vault_name
+  vault_type     = "DEFAULT"
+}
+
+resource "oci_kms_key" "newrelic_key" {
+  compartment_id = var.compartment_ocid
+  display_name   = "newrelic-key"
+  key_shape {
+    algorithm = "AES"
+    length    = 32
+  }
+  management_endpoint = oci_kms_vault.newrelic_vault.management_endpoint
+}
+
+resource "oci_vault_secret" "api_key" {
+  compartment_id = var.compartment_ocid
+  vault_id       = oci_kms_vault.newrelic_vault.id
+  key_id         = oci_kms_key.newrelic_key.id
+  secret_name    = "NewRelicAPIKey"
+  description    = "Secret containing New Relic ingest API key"
+  secret_content {
+    content_type = "BASE64"
+    content      = base64encode(var.newrelic_ingest_api_key)
+    name         = "testkey"
+  }
+}

@@ -30,8 +30,20 @@ variable "newrelic_account_id" {
   description = "The New Relic account ID for sending metrics to New Relic endpoints"
 }
 
+variable "newrelic_ingest_api_key" {
+  type        = string
+  sensitive   = true
+  description = "The Ingest API key for sending logs to New Relic endpoints"
+}
+
 variable "newrelic_user_api_key" {
   type        = string
   sensitive   = true
   description = "The User API key for Linking the OCI Account to the New Relic account"
+}
+
+variable "kms_vault_name" {
+  type        = string
+  description = "The display name of the KMS vault for storing New Relic secrets"
+  default     = "newrelic-vault"
 }
