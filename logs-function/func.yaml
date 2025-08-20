@@ -1,9 +1,4 @@
 schema_version: 20180708
 name: logs-function
 version: 0.0.1
-# runtime: go
-# build_image: fnproject/go:1.24-dev
-# run_image: fnproject/go:1.24
-# entrypoint: ./main
-# Add this line with your full OCIR image path and tag
-image: ocir.us-ashburn-1.oci.oraclecloud.com/idfmbxeaoavl/sanath-testing-registry/oci-function-vault-test:0.0.1
+image: ocir.us-ashburn-1.oci.oraclecloud.com/idfmbxeaoavl/testing-registry/oci-function-test:0.0.1
