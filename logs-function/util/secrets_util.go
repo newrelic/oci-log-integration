@@ -25,7 +25,7 @@ type OCISecretsManagerAPI interface {
 
 // GetSecretFromOCIVault retrieves a secret from OCI Vault.
 // It returns the secret string and an error if any.
-func GetSecretFromOCIVault(ctx context.Context, secretsClient OCISecretsManagerAPI, secretOCID, vaultRegion string) (string, error) {
+func GetSecretFromOCIVault(ctx context.Context, secretsClient OCISecretsManagerAPI, secretOCID string, vaultRegion string) (string, error) {
 	// Check if the passed secret OCID is empty
 	if secretOCID == "" {
 		return "", errors.New("secret OCID is empty")
@@ -113,14 +113,6 @@ func GetLicenseKeyWithContext(ctx context.Context) (key string, err error) {
 	// Get secret OCID and vault region from environment
 	secretOCID := os.Getenv(common.SecretOCID)
 	vaultRegion := os.Getenv(common.VaultRegion)
-
-	if secretOCID == "" {
-		return "", errors.New("SecretOCID environment variable is not set")
-	}
-
-	if vaultRegion == "" {
-		return "", errors.New("VaultRegion environment variable is not set")
-	}
 
 	// Create OCI secrets client
 	secretsClient, err := NewOCISecretsManagerClient()

@@ -261,12 +261,6 @@ func TestGetLicenseKeyFromEnv(t *testing.T) {
 			expectedLicense: "env-license-key",
 			expectedError:   "",
 		},
-		{
-			name:            "empty environment variable",
-			envLicenseKey:   "",
-			expectedLicense: "",
-			expectedError:   "SecretOCID environment variable is not set",
-		},
 	}
 
 	for _, tt := range tests {
