@@ -16,79 +16,21 @@ provider "oci" {
   region       = var.newrelic_region
 }
 
-data "oci_identity_user" "current_user" {
-  user_id = var.current_user_ocid
-}
-
-data "oci_identity_tenancy" "current_tenancy" {
-  tenancy_id = var.tenancy_ocid
-}
-
-
 
 locals {
 
-  compartment_ocid_for_core_resources = var.tenancy_ocid
-  resource_prefix                     = var.label_prefix
-
   freeform_tags = {
-    newrelic-logging-terraform = "true"
-    deployment-prefix          = local.resource_prefix
+    newrelic-terraform = "true"
   }
+   # Names for the network infra
+  vcn_name        = "${var.newrelic_logging_prefix}-logging-vcn"
+  nat_gateway     = "${local.vcn_name}-natgateway"
+  service_gateway = "${local.vcn_name}-servicegateway"
+  subnet          = "${local.vcn_name}-public-subnet"
 
-  vcn_name           = "${local.resource_prefix}-vcn"
-  nat_gateway        = "${local.resource_prefix}-natgateway"
-  service_gateway    = "${local.resource_prefix}-servicegateway"
-  subnet             = "${local.resource_prefix}-public-subnet"
-  dynamic_group_name = "${local.resource_prefix}-dynamic-group"
-  policy_name        = "${local.resource_prefix}-policy"
-  function_app_name  = "${local.resource_prefix}-function-app"
-  connector_hub_name = "${local.resource_prefix}-connector-hub"
-}
-
-# Data source to find the compartment OCID for EACH log source.
-# This uses for_each to iterate over the provided log_sources.
-data "oci_identity_compartments" "log_source_compartments" {
-  for_each = {
-    for idx, source in jsondecode(var.log_sources) : idx => source
-    # Only run this data source if the compartment name is NOT the tenancy name
-    if source.compartment_name != data.oci_identity_tenancy.current_tenancy.name
-  }
-
-  # Search within the root (tenancy) for the named child compartment
-  compartment_id = var.tenancy_ocid
-
-  filter {
-    name   = "name"
-    values = [each.value.compartment_name]
-  }
-}
-
-# Lookup log group OCID by name for EACH log source
-data "oci_logging_log_groups" "log_source_groups" {
-  for_each = { for idx, source in jsondecode(var.log_sources) : idx => source }
-
-  # Dynamically determine the compartment_id for the log group:
-  # If the compartment_name matches the tenancy's display name, use tenancy_ocid directly.
-  # Otherwise, use the OCID found by the log_source_compartments data source for that key.
-  # Ensure the entire ternary expression is on a single logical line or properly continued
-  compartment_id = each.value.compartment_name == data.oci_identity_tenancy.current_tenancy.name ? var.tenancy_ocid : data.oci_identity_compartments.log_source_compartments[each.key].compartments[0].id
-
-  filter {
-    name   = "display_name"
-    values = [each.value.log_group_name]
-  }
-}
-
-# Lookup log OCID by name for EACH log source (if log_name is provided)
-data "oci_logging_logs" "log_source_logs" {
-  for_each = { for idx, source in jsondecode(var.log_sources) : idx => source if source.log_name != "" } # Only lookup if log_name is not empty
-
-  # Use the dynamically found log group OCID for this specific log source
-  log_group_id = data.oci_logging_log_groups.log_source_groups[each.key].log_groups[0].id
-  filter {
-    name   = "display_name"
-    values = [each.value.log_name]
+  connectors = jsondecode(data.external.connector_payload.result.connectors)
+  connectors_map = {
+    for conn in local.connectors : conn.display_name => conn
   }
 }
 
@@ -96,54 +38,20 @@ data "oci_logging_logs" "log_source_logs" {
 
 
 
-
-
-
-
-
-
-
-#Resource for the dynamic group
-resource "oci_identity_dynamic_group" "nr_serviceconnector_group" {
-  compartment_id = var.tenancy_ocid
-  description    = "[DO NOT REMOVE] Dynamic group for service connector"
-  matching_rule  = "All {resource.type = 'serviceconnector'}"
-  name           = local.dynamic_group_name
-  defined_tags   = {}
-  freeform_tags  = local.freeform_tags
-}
-
-# Resource for the policy 
-resource "oci_identity_policy" "nr_logging_policy" {
-  depends_on     = [oci_identity_dynamic_group.nr_serviceconnector_group]
-  compartment_id = var.tenancy_ocid
-  description    = "[DO NOT REMOVE] Policy to have any connector hub read from logging source and write to a target function"
-  name           = local.policy_name
-  statements = [
-    "Allow dynamic-group ${local.dynamic_group_name} to read logs in tenancy",
-    "Allow dynamic-group ${local.dynamic_group_name} to use fn-function in tenancy",
-    "Allow dynamic-group ${local.dynamic_group_name} to use fn-invocation in tenancy",
-    "Allow dynamic-group ${local.dynamic_group_name} to inspect log-groups in tenancy"
-  ]
-  defined_tags  = {}
-  freeform_tags = local.freeform_tags
-}
-
-#Resource for the function application
+#Resource for the logging function application
 resource "oci_functions_application" "logging_function_app" {
-  depends_on     = [oci_identity_policy.nr_logging_policy]
-  compartment_id = local.compartment_ocid_for_core_resources
+  compartment_id = var.compartment_ocid
   config = {
     "VAULT_REGION"  = var.newrelic_region
     "DEBUG_ENABLED" = var.debug_enabled
   }
   defined_tags               = {}
-  display_name               = local.function_app_name
+  display_name               = "${var.newrelic_logging_prefix}-logging-function-app"
   freeform_tags              = local.freeform_tags
   network_security_group_ids = []
-  shape                      = var.function_app_shape
+  shape                      = "GENERIC_X86"
   subnet_ids = [
-    module.vcn.subnet_id[local.subnet],
+    data.oci_core_subnet.input_subnet.id,
   ]
 }
 
@@ -158,14 +66,51 @@ resource "oci_functions_function" "logging_function" {
   defined_tags  = {}
   freeform_tags = local.freeform_tags
   image         = "${var.newrelic_region}.ocir.io/idms1yfytybe/oci-testing-registry/oci-function-x86:0.0.1" #TODO to change the actual function name 
+  provisioned_concurrency_config {
+    strategy = "CONSTANT"
+    count = 20
+  }
 }
 
+
+# Service Connector Hub - Routes logs from multiple log groups to New Relic function
+resource "oci_sch_service_connector" "nr_logging_service_connector" {
+  for_each = local.connectors_map
+
+  compartment_id = var.compartment_ocid
+  display_name   = each.value.display_name
+  description    = each.value.description
+  freeform_tags  = local.freeform_tags
+
+  source {
+    kind = "logging"
+    dynamic "log_sources" {
+      for_each = each.value.log_sources
+      content {
+        compartment_id = log_sources.value.compartment_id
+        log_group_id   = log_sources.value.log_group_id
+        log_id         = log_sources.value.log_id
+      }
+    }
+  }
+
+  target {
+    kind              = "functions"
+    batch_size_in_kbs = 100
+    batch_time_in_sec = 60
+    compartment_id    = var.compartment_ocid
+    function_id       = oci_functions_function.logging_function.id
+  }
+
+  depends_on = [oci_functions_function.logging_function]
+}
 
 
 module "vcn" {
   source                   = "oracle-terraform-modules/vcn/oci"
   version                  = "3.6.0"
-  compartment_id           = local.compartment_ocid_for_core_resources
+  count                    = var.create_vcn ? 1 : 0
+  compartment_id           = var.compartment_ocid
   defined_tags             = {}
   freeform_tags            = local.freeform_tags
   vcn_cidrs                = ["10.0.0.0/16"]
@@ -189,8 +134,9 @@ module "vcn" {
 
 data "oci_core_route_tables" "default_vcn_route_table" {
   depends_on     = [module.vcn] # Ensure VCN is created before attempting to find its route tables
-  compartment_id = local.compartment_ocid_for_core_resources
-  vcn_id         = module.vcn.vcn_id # Get the VCN ID from the module output
+  count = var.create_vcn ? 1 : 0
+  compartment_id = var.compartment_ocid
+  vcn_id         = module.vcn[0].vcn_id 
 
   filter {
     name   = "display_name"
@@ -201,56 +147,40 @@ data "oci_core_route_tables" "default_vcn_route_table" {
 
 # Resource to manage the VCN's default route table and add your rule.
 resource "oci_core_default_route_table" "default_internet_route" {
-  manage_default_resource_id = data.oci_core_route_tables.default_vcn_route_table.route_tables[0].id
+  manage_default_resource_id = data.oci_core_route_tables.default_vcn_route_table[0].route_tables[0].id
   depends_on = [
     module.vcn,
-    data.oci_core_route_tables.default_vcn_route_table # Ensure the data source has run
+    data.oci_core_route_tables.default_vcn_route_table 
   ]
   route_rules {
     destination       = "0.0.0.0/0"
     destination_type  = "CIDR_BLOCK"
-    network_entity_id = module.vcn.internet_gateway_id # Reference the internet gateway created by the module
+    network_entity_id = module.vcn[0].internet_gateway_id # Reference the internet gateway created by the module
     description       = "Route to Internet Gateway for New Relic logging"
   }
 
 }
 
-# Service Connector Hub - Routes logs from multiple OCI sources to New Relic function
-resource "oci_sch_service_connector" "nr_service_connector" {
-  depends_on     = [oci_functions_function.logging_function]
-  compartment_id = local.compartment_ocid_for_core_resources
-  display_name   = local.connector_hub_name
-
-  # Source Configuration with Logging
-  source {
-    kind = "logging"
-
-    # Create a log_sources block for each log source
-    dynamic "log_sources" {
-      for_each = jsondecode(var.log_sources)
-      content {
-        # Use the correct compartment resolution logic
-        compartment_id = log_sources.value.compartment_name == data.oci_identity_tenancy.current_tenancy.name ? var.tenancy_ocid : data.oci_identity_compartments.log_source_compartments[log_sources.key].compartments[0].id
-
-        # Use the correct data source names
-        log_group_id = data.oci_logging_log_groups.log_source_groups[log_sources.key].log_groups[0].id
-
-        # Conditionally set log_id if log_name is provided
-        log_id = log_sources.value.log_name != "" ? data.oci_logging_logs.log_source_logs[log_sources.key].logs[0].id : null
-      }
-    }
+output "vcn_network_details" {
+  depends_on  = [module.vcn]
+  description = "Output of the created network infra"
+  value = var.create_vcn && length(module.vcn) > 0 ? {
+    vcn_id             = module.vcn[0].vcn_id
+    nat_gateway_id     = module.vcn[0].nat_gateway_id
+    nat_route_id       = module.vcn[0].nat_route_id
+    service_gateway_id = module.vcn[0].service_gateway_id
+    sgw_route_id       = module.vcn[0].sgw_route_id
+    subnet_id          = module.vcn[0].subnet_id[local.subnet]
+  } : {
+    vcn_id             = ""
+    nat_gateway_id     = ""
+    nat_route_id       = ""
+    service_gateway_id = ""
+    sgw_route_id       = ""
+    subnet_id          = var.function_subnet_id
   }
+}
 
-  # Target Configuration with Functions
-  target {
-    kind              = "functions"
-    batch_size_in_kbs = 100
-    batch_time_in_sec = 60
-    compartment_id    = local.compartment_ocid_for_core_resources
-    function_id       = oci_functions_function.logging_function.id
-  }
-
-  description   = "Service Connector for multiple OCI log sources to New Relic Functions"
-  defined_tags  = {}
-  freeform_tags = local.freeform_tags
+output "stack_id" {
+  value = data.oci_resourcemanager_stacks.current_stack.stacks[0].id
 }

@@ -6,29 +6,20 @@ description: >
 schemaVersion: 1.1.0
 version: "1.0.0"
 locale: "en"
-
 variableGroups:
-  - title: "OCI Configuration"
-    visible: true
-    variables:
-      - tenancy_ocid
-      - current_user_ocid
-      - newrelic_region
-
   - title: "New Relic Environment Configuration"
     visible: true
     variables:
-      - newrelic_logging_endpoint
-      - label_prefix
-
-  - title: "Resource Configuration"
-    visible: true
+      - ${newrelic_logging_endpoint}
+      - ${newrelic_logging_prefix}
+      - ${home_secret_ocid}
+      - ${payload_link}
+   - title: "Network options"
     variables:
-      - newrelic_dynamic_group_name
-      - newrelic_logging_policy
-      - newrelic_function_app
-      - newrelic_connector_hub_name
-      - function_app_shape
+      - ${create_vcn}
+      - ${vcnCompartment}
+      - ${existingVcn}
+      - ${function_subnet_id}
 
 variables:
   tenancy_ocid:
@@ -37,11 +28,11 @@ variables:
     description: "OCI tenant OCID, more details can be found at https://docs.cloud.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#five"
     required: true
     visible: false
-
-  current_user_ocid:
+  
+  compartment_ocid:
     type: string
-    title: "User OCID"
-    description: "The OCID of the current user executing the terraform script. Do not modify."
+    title: Compartment OCID
+    description: The OCID of the compartment where the resources will be created.
     required: true
     visible: false
 
@@ -52,19 +43,12 @@ variables:
     required: true
     visible: false
 
-  newrelic_dynamic_group_name:
+  newrelic_logging_prefix:
     type: string
-    title: "New Relic Dynamic Group Name"
-    description: "The name of the dynamic group for giving access to service connector"
+    title: New Relic logging prefix
+    description: The prefix to use for New Relic logging resources for Function and VCNs.
     required: true
-    default: "newrelic-logging-dynamic-group"
-
-  newrelic_logging_policy:
-    type: string
-    title: "New Relic Logging Policy"
-    description: "The name of the policy for logging"
-    required: true
-    default: "newrelic-logging-policy"
+    default: newrelic-logging
 
   newrelic_logging_endpoint:
     type: enum
@@ -76,33 +60,46 @@ variables:
       - "https://log-api.newrelic.com/log/v1"
       - "https://log-api.eu.newrelic.com/log/v1"
 
-  newrelic_function_app:
+  home_secret_ocid:
     type: string
-    title: "New Relic Function App Name"
-    description: "The name of the function application"
+    title: Home Vault Secret OCID
+    description: The OCID of the secret in the home region that contains the New Relic Ingest API key.
     required: true
-    default: "newrelic-logging-function-app"
+    visible: true
 
-  newrelic_connector_hub_name:
+  create_vcn:
+    title: Create VCN
+    description: Create virtual network (VCN) for the function setup. If using existing networking resources, de-select "Create VCN" and select the relevant VCN and subnet to use.
+    type: boolean
+    default: true
+
+  payload_link:
+    title: Payload Link
+    description: The link to the payload for the connector hubs.
     type: string
-    title: "New Relic Connector Hub Name"
-    description: "The prefix for the name of all of the resources"
     required: true
-    default: "newrelic-connector-hub"
+    visible: true
 
-  function_app_shape:
-    type: enum
-    title: "Function App Shape"
-    description: "The shape of the function application. The docker image should be built accordingly. Use ARM if using Oracle Resource Manager stack"
-    required: true
-    default: "GENERIC_X86"
-    visible: false
-    enum:
-      - "GENERIC_X86"
-      - "GENERIC_ARM"
-
-  log_sources:
-    type: string
-    title: "Log Sources (JSON String Array)"
-    description: "Enter a JSON string array of log sources. Example: [{\"compartment_name\":\"Comp1\",\"log_group_name\":\"Group1\",\"log_name\":\"Log1\"},{\"compartment_name\":\"Comp2\",\"log_group_name\":\"Group2\",\"log_name\":\"Log2\"}]"
-    required: true
+  vcnCompartment:
+    type: oci:identity:compartment:id
+    visible:
+      not:
+        - ${create_vcn}
+  existingVcn:
+    type: oci:core:vcn:id
+    visible:
+      not:
+        - ${create_vcn}
+    dependsOn:
+      compartmentId: ${vcnCompartment}
+  function_subnet_id:
+    title: Function Subnet OCID
+    type: oci:core:subnet:id
+    visible:
+      not:
+        - ${create_vcn}
+    description: The subnet to be used by the function app that will be deployed. If "Create VCN" is selected, the new VCN will overwrite this selection..
+    required: false
+    dependsOn:
+      compartmentId: ${vcnCompartment}
+      vcnId: ${existingVcn}
