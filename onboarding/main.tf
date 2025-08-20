@@ -13,36 +13,6 @@ provider "oci" {
   region       = var.region
 }
 
-locals {
-  newrelic_graphql_endpoint = "https://api.newrelic.com/graphql"
-  linkAccount_graphql_query = <<EOF
-   mutation {
-    cloudLinkAccount(
-    accountId: ${var.newrelic_account_id},
-    accounts: {oci: {name: "nr_oci", tenantId: "${var.tenancy_ocid}"}}
-  ) {
-    errors {
-      linkedAccountId
-      providerSlug
-      message
-      nrAccountId
-      type
-    }
-    linkedAccounts {
-      id
-      authLabel
-      createdAt
-      disabled
-      externalId
-      name
-      nrAccountId
-      updatedAt
-    }
-  }
-}
-  EOF
-}
-
 # Cross-Tenancy New Relic Read-Only Access Policy
 resource "oci_identity_policy" "cross_tenancy_read_only_policy" {
   compartment_id = var.compartment_ocid
@@ -91,43 +61,7 @@ resource "oci_identity_policy" "functions_vault_access_policy" {
   ]
 }
 
-# Resource to link the New Relic account and configure the integration
-resource "null_resource" "newrelic_link_account" {
-  provisioner "local-exec" {
-    command = <<EOT
-      # Main execution for cloudLinkAccount
-      response=$(curl --silent --request POST \
-        --url "${local.newrelic_graphql_endpoint}" \
-        --header "API-Key: ${var.newrelic_user_api_key}" \
-        --header "Content-Type: application/json" \
-        --header "User-Agent: insomnia/11.1.0" \
-        --data '${jsonencode({
-          query = local.linkAccount_graphql_query
-        })}')
-
-      # Log the full response for debugging
-      echo "Full Response: $response"
-
-      # Extract errors from the response
-      root_errors=$(echo "$response" | jq -r '.errors[]?.message // empty')
-      account_errors=$(echo "$response" | jq -r '.data.cloudLinkAccount.errors[]?.message // empty')
-
-      # Combine errors
-      errors="$root_errors"$'\n'"$account_errors"
-
-      # Check if errors exist
-      if [ -n "$errors" ] && [ "$errors" != $'\n' ]; then
-        echo "Operation failed with the following errors:" >&2
-        echo "$errors" | while IFS= read -r error; do
-          echo "- $error" >&2
-        done
-        exit 1
-      fi
-
-    EOT
-  }
-}
-
+# KMS Vault for Ingest License Key
 resource "oci_kms_vault" "newrelic_vault" {
   compartment_id = var.compartment_ocid
   display_name   = "newrelic-vault"
