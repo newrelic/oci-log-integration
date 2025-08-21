@@ -4,12 +4,21 @@ package util
 
 import (
 	"context"
+	"os"
+	"sync"
+
 	"github.com/newrelic/newrelic-client-go/v2/pkg/config"
 	logging "github.com/newrelic/newrelic-client-go/v2/pkg/logs"
 	"github.com/newrelic/newrelic-client-go/v2/pkg/region"
+	
 	"github.com/newrelic/oci-log-integration/logs-function/common"
-	"os"
-	"sync"
+)
+
+// Global variables for caching the NewRelic client
+var (
+	cachedNRClient   NewRelicClientAPI
+	nrClientOnce     sync.Once
+	nrClientError    error
 )
 
 // NewRelicClientAPI is an interface that defines the methods for interacting with the New Relic Logs API.
@@ -43,7 +52,20 @@ func ConsumeLogBatches(ctx context.Context, channel <-chan common.DetailedLogsBa
 
 // NewNRClient Initializes a new NRClient with debug level and region
 // It returns a NewRelicClientAPI interface and an error if there is a problem setting the region.
+// Uses lazy initialization with caching for performance.
 func NewNRClient() (NewRelicClientAPI, error) {
+	nrClientOnce.Do(func() {
+		log.Debug("Initializing New Relic client (lazy initialization)")
+		cachedNRClient, nrClientError = createNRClient()
+		if nrClientError == nil {
+			log.Debug("New Relic client initialized successfully")
+		}
+	})
+	return cachedNRClient, nrClientError
+}
+
+// createNRClient creates a new NewRelic client instance
+func createNRClient() (NewRelicClientAPI, error) {
 	nrRegion, _ := region.Get(region.Name(os.Getenv(common.NewRelicRegion)))
 	var nrClient logging.Logs
 	cfg := config.Config{

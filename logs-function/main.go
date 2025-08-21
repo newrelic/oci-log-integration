@@ -19,17 +19,24 @@ import (
 var log = logger.NewLogrusLogger(logger.WithDebugLevel())
 
 func main() {
-	log.Debug("Initializing NewRelic client (cached for container lifecycle)")
+	log.Debug("Setting up function handler")
+	handler := func(ctx context.Context, in io.Reader, out io.Writer) {
+		handleFunction(ctx, in, out)
+	}
+	fdk.Handle(fdk.HandlerFunc(handler))
+}
+
+// handleFunction processes OCI logging events and forwards them to New Relic.
+// It creates the NewRelic client on each invocation (like your working simple function).
+func handleFunction(ctx context.Context, in io.Reader, out io.Writer) {
+	// Create NewRelic client during function invocation, not startup
 	nrClient, err := util.NewNRClient()
 	if err != nil {
-		log.Fatalf("error initializing newrelic client: %v", err)
-	} else {
-		log.Debug("NewRelic client initialized successfully")
-		handler := func(ctx context.Context, in io.Reader, out io.Writer) {
-			handleFunctionWithClient(ctx, in, out, nrClient)
-		}
-		fdk.Handle(fdk.HandlerFunc(handler))
+		log.Errorf("error initializing newrelic client: %v", err)
+		return
 	}
+	
+	handleFunctionWithClient(ctx, in, out, nrClient)
 }
 
 // handleFunctionWithClient processes OCI logging events and forwards them to New Relic.

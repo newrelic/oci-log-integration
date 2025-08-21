@@ -13,6 +13,13 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// Test helper function to reset NewRelic client cache
+func resetNRClient() {
+	cachedNRClient = nil
+	nrClientError = nil
+	nrClientOnce = sync.Once{}
+}
+
 // MockNRClient is a mock type for the Logs interface.
 type MockNRClient struct {
 	mock.Mock
@@ -76,6 +83,9 @@ func TestNewNRClient(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			// Reset client cache for each test
+			resetNRClient()
+
 			// Setup environment variables
 			if tc.envDebug != "" {
 				os.Setenv(common.DebugEnabled, tc.envDebug)
