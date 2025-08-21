@@ -22,6 +22,12 @@ const NewRelicRegion = "NEW_RELIC_REGION"
 // DebugEnabled is the name of the environment variable for enabling debug mode.
 const DebugEnabled = "DEBUG_ENABLED"
 
+// ClientTTL is the name of the environment variable for setting the NewRelic client cache TTL in seconds.
+const ClientTTL = "CLIENT_TTL"
+
+// DefaultClientTTL is the default TTL for the NewRelic client cache in seconds (10 minutes = 600 seconds).
+const DefaultClientTTL = 600
+
 // MaxPayloadSize is the maximum size of a payload.
 // Reference: https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/#limits
 const MaxPayloadSize = 1 * 1024 * 1024 // 1 mb

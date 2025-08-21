@@ -30,8 +30,6 @@ func (event *Event) Unmarshal(in io.Reader) error {
 		return nil
 	}
 
-	log.Debugf("Raw payload received: %s", string(payloadBytes))
-
 	var incomingLogEvent common.OCILoggingEvent
 	if err := json.Unmarshal(payloadBytes, &incomingLogEvent); err == nil {
 		event.EventType = OCI_LOGGING

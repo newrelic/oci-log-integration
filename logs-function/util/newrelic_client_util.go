@@ -5,20 +5,22 @@ package util
 import (
 	"context"
 	"os"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/newrelic/newrelic-client-go/v2/pkg/config"
 	logging "github.com/newrelic/newrelic-client-go/v2/pkg/logs"
 	"github.com/newrelic/newrelic-client-go/v2/pkg/region"
-	
+
 	"github.com/newrelic/oci-log-integration/logs-function/common"
 )
 
-// Global variables for caching the NewRelic client
+// Global variables for caching the NewRelic client with TTL support
 var (
-	cachedNRClient   NewRelicClientAPI
-	nrClientOnce     sync.Once
-	nrClientError    error
+	cachedNRClient  NewRelicClientAPI
+	nrClientError   error
+	clientCacheTime time.Time
 )
 
 // NewRelicClientAPI is an interface that defines the methods for interacting with the New Relic Logs API.
@@ -52,16 +54,41 @@ func ConsumeLogBatches(ctx context.Context, channel <-chan common.DetailedLogsBa
 
 // NewNRClient Initializes a new NRClient with debug level and region
 // It returns a NewRelicClientAPI interface and an error if there is a problem setting the region.
-// Uses lazy initialization with caching for performance.
+// Uses TTL-based caching for performance in OCI Function environment.
 func NewNRClient() (NewRelicClientAPI, error) {
-	nrClientOnce.Do(func() {
-		log.Debug("Initializing New Relic client (lazy initialization)")
-		cachedNRClient, nrClientError = createNRClient()
-		if nrClientError == nil {
-			log.Debug("New Relic client initialized successfully")
+	// Check if cache is still valid
+	if cachedNRClient != nil {
+		ttl := getClientTTL()
+		if time.Since(clientCacheTime) < ttl {
+			// Return cached client (even if there was an error before)
+			log.Debug("Returning cached New Relic client")
+			return cachedNRClient, nrClientError
 		}
-	})
+	}
+
+	// Cache is invalid, expired, or doesn't exist - create new client
+	log.Debug("Initializing/refreshing New Relic client")
+	cachedNRClient, nrClientError = createNRClient()
+	clientCacheTime = time.Now()
+
+	if nrClientError == nil {
+		log.Debug("New Relic client initialized successfully")
+	}
+
 	return cachedNRClient, nrClientError
+}
+
+// getClientTTL returns the TTL for the client cache from environment variable or default (600 seconds = 10 minutes)
+func getClientTTL() time.Duration {
+	ttlSeconds := common.DefaultClientTTL // Default TTL in seconds
+
+	if envTTL := os.Getenv(common.ClientTTL); envTTL != "" {
+		if parsedTTL, err := strconv.Atoi(envTTL); err == nil && parsedTTL > 0 {
+			ttlSeconds = parsedTTL
+		}
+	}
+
+	return time.Duration(ttlSeconds) * time.Second
 }
 
 // createNRClient creates a new NewRelic client instance

@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/newrelic/oci-log-integration/logs-function/common"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ import (
 func resetNRClient() {
 	cachedNRClient = nil
 	nrClientError = nil
-	nrClientOnce = sync.Once{}
+	clientCacheTime = time.Time{}
 }
 
 // MockNRClient is a mock type for the Logs interface.
@@ -36,6 +37,7 @@ type newNRClientTestCase struct {
 	name             string // Name of the test case
 	envDebug         string // Environment variable for debug
 	envRegion        string // Environment variable for region
+	envTTL           string // Environment variable for client TTL
 	expectedLogLevel string // Expected log level
 	expectError      bool   // Whether an error is expected
 	envOCID          string // Environment variable for OCI Data
@@ -79,6 +81,15 @@ func TestNewNRClient(t *testing.T) {
 			expectError: true,
 			description: "Should fail when no OCI configuration is available",
 		},
+		{
+			name:           "Custom TTL configuration",
+			envRegion:      "us",
+			envTTL:         "300",
+			envOCID:        "valid_ocid",
+			envVaultRegion: "us-ashburn-1",
+			expectError:    true,
+			description:    "Should respect custom TTL setting (300 seconds)",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -94,6 +105,10 @@ func TestNewNRClient(t *testing.T) {
 			if tc.envRegion != "" {
 				os.Setenv(common.NewRelicRegion, tc.envRegion)
 				defer os.Unsetenv(common.NewRelicRegion)
+			}
+			if tc.envTTL != "" {
+				os.Setenv(common.ClientTTL, tc.envTTL)
+				defer os.Unsetenv(common.ClientTTL)
 			}
 
 			if tc.envOCID != "" {
@@ -144,4 +159,89 @@ func TestConsumeLogBatches(t *testing.T) {
 	close(channel)
 	wg.Wait()
 	mockNRClient.AssertNumberOfCalls(t, "CreateLogEntry", 1)
+}
+
+// TestClientTTL tests the TTL functionality of the NewRelic client cache
+func TestClientTTL(t *testing.T) {
+	// Reset client cache
+	resetNRClient()
+
+	// Set up environment for testing
+	os.Setenv(common.NewRelicRegion, "us")
+	os.Setenv(common.ClientTTL, "60") // 60 seconds TTL for faster testing
+	os.Setenv("SECRET_OCID", "test_ocid")
+	os.Setenv("VAULT_REGION", "us-ashburn-1")
+
+	defer func() {
+		os.Unsetenv(common.NewRelicRegion)
+		os.Unsetenv(common.ClientTTL)
+		os.Unsetenv("SECRET_OCID")
+		os.Unsetenv("VAULT_REGION")
+	}()
+
+	// First call should attempt to create client (will fail due to mock environment)
+	_, err1 := NewNRClient()
+	assert.Error(t, err1, "Expected error due to test environment")
+
+	// Verify cache time was set
+	firstCacheTime := clientCacheTime
+	assert.False(t, firstCacheTime.IsZero(), "Cache time should be set")
+
+	// Second call within TTL should return cached result (same error)
+	_, err2 := NewNRClient()
+	assert.Error(t, err2, "Should return cached error")
+	assert.Equal(t, err1.Error(), err2.Error(), "Should return same cached error")
+
+	// Verify cache time hasn't changed
+	secondCacheTime := clientCacheTime
+	assert.Equal(t, firstCacheTime, secondCacheTime, "Cache time should not change for cached response")
+}
+
+// TestGetClientTTL tests the getClientTTL function
+func TestGetClientTTL(t *testing.T) {
+	tests := []struct {
+		name        string
+		envValue    string
+		expectedTTL time.Duration
+	}{
+		{
+			name:        "Default TTL when no env var",
+			envValue:    "",
+			expectedTTL: 600 * time.Second,
+		},
+		{
+			name:        "Custom TTL from env var",
+			envValue:    "300",
+			expectedTTL: 300 * time.Second,
+		},
+		{
+			name:        "Invalid TTL falls back to default",
+			envValue:    "invalid",
+			expectedTTL: 600 * time.Second,
+		},
+		{
+			name:        "Zero TTL falls back to default",
+			envValue:    "0",
+			expectedTTL: 600 * time.Second,
+		},
+		{
+			name:        "Negative TTL falls back to default",
+			envValue:    "-5",
+			expectedTTL: 600 * time.Second,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envValue != "" {
+				os.Setenv(common.ClientTTL, tt.envValue)
+				defer os.Unsetenv(common.ClientTTL)
+			} else {
+				os.Unsetenv(common.ClientTTL)
+			}
+
+			actualTTL := getClientTTL()
+			assert.Equal(t, tt.expectedTTL, actualTTL)
+		})
+	}
 }
