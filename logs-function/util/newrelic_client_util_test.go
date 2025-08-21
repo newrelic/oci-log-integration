@@ -36,7 +36,6 @@ type newNRClientTestCase struct {
 	name             string // Name of the test case
 	envDebug         string // Environment variable for debug
 	envRegion        string // Environment variable for region
-	envLicenseKey    string // Environment variable for license key
 	expectedLogLevel string // Expected log level
 	expectError      bool   // Whether an error is expected
 	envOCID          string // Environment variable for OCI Data
@@ -48,36 +47,37 @@ type newNRClientTestCase struct {
 func TestNewNRClient(t *testing.T) {
 	testCases := []newNRClientTestCase{
 		{
-			name:             "Debug enabled with env license key",
+			name:             "Debug enabled with OCI vault",
 			envDebug:         "true",
 			envRegion:        "us",
-			envLicenseKey:    "valid_license_key",
 			expectedLogLevel: "debug",
-			expectError:      false,
-			description:      "Should work when license key is provided via environment variable",
+			envOCID:          "valid_ocid",
+			envVaultRegion:   "us-ashburn-1",
+			expectError:      true,
+			description:      "Should attempt OCI vault retrieval but fail in test environment",
 		},
 		{
-			name:             "Debug disabled with env license key",
+			name:             "Debug disabled with OCI vault",
 			envRegion:        "us",
-			envLicenseKey:    "valid_license_key",
 			expectedLogLevel: "info",
-			expectError:      false,
-			description:      "Should work when license key is provided via environment variable",
+			envOCID:          "valid_ocid",
+			envVaultRegion:   "us-ashburn-1",
+			expectError:      true,
+			description:      "Should attempt OCI vault retrieval but fail in test environment",
 		},
 		{
-			name:          "Invalid region with env license key",
-			envRegion:     "invalid",
-			envLicenseKey: "valid_license_key",
-			expectError:   false,
-			description:   "Should handle invalid region gracefully when license key is in env",
-		},
-		{
-			name:           "No license key - should try OCI and fail",
-			envRegion:      "us",
-			envVaultRegion: "us-ashburn-1",
+			name:           "Invalid region with OCI vault",
+			envRegion:      "invalid",
 			envOCID:        "valid_ocid",
+			envVaultRegion: "us-ashburn-1",
 			expectError:    true,
-			description:    "Should fail when license key is not in env and OCI auth is not available",
+			description:    "Should handle invalid region and fail in test environment",
+		},
+		{
+			name:        "No OCI configuration - should fail",
+			envRegion:   "us",
+			expectError: true,
+			description: "Should fail when no OCI configuration is available",
 		},
 	}
 
@@ -94,10 +94,6 @@ func TestNewNRClient(t *testing.T) {
 			if tc.envRegion != "" {
 				os.Setenv(common.NewRelicRegion, tc.envRegion)
 				defer os.Unsetenv(common.NewRelicRegion)
-			}
-			if tc.envLicenseKey != "" {
-				os.Setenv(common.EnvLicenseKey, tc.envLicenseKey)
-				defer os.Unsetenv(common.EnvLicenseKey)
 			}
 
 			if tc.envOCID != "" {

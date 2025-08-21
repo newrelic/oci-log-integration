@@ -93,21 +93,15 @@ func NewOCISecretsManagerClient() (OCISecretsManagerAPI, error) {
 	return &secretsClient, nil
 }
 
-// GetLicenseKey returns the license key from the environment variable or the OCI Secrets Manager.
+// GetLicenseKey returns the license key from the OCI Secrets Manager.
 // It returns the New Relic Ingest License key and an error if any.
 func GetLicenseKey() (key string, err error) {
 	return GetLicenseKeyWithContext(context.Background())
 }
 
-// GetLicenseKeyWithContext returns the license key from the environment variable or the OCI Secrets Manager with context.
+// GetLicenseKeyWithContext returns the license key from the OCI Secrets Manager with context.
 // It returns the New Relic Ingest License key and an error if any.
 func GetLicenseKeyWithContext(ctx context.Context) (key string, err error) {
-	// First try to get from environment variable
-	if os.Getenv(common.EnvLicenseKey) != "" {
-		log.Debug("fetching license key from environment variable")
-		return os.Getenv(common.EnvLicenseKey), nil
-	}
-
 	log.Debug("fetching license key from OCI vault")
 
 	// Get secret OCID and vault region from environment

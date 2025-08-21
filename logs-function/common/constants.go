@@ -26,8 +26,5 @@ const DebugEnabled = "DEBUG_ENABLED"
 // Reference: https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/#limits
 const MaxPayloadSize = 1 * 1024 * 1024 // 1 mb
 
-// Environment variable names
-const EnvLicenseKey = "NEW_RELIC_LICENSE_KEY"
-
 // Secret field names
 const LicenseKey = "licenseKey"

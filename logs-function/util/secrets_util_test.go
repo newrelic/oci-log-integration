@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"os"
 	"testing"
 
 	"github.com/oracle/oci-go-sdk/v65/secrets"
@@ -232,62 +231,6 @@ func TestGetLicenseKeyWithMockClient(t *testing.T) {
 				}
 				if licenseKey != tt.expectedSecret {
 					t.Errorf("Expected license key '%s', but got '%s'", tt.expectedSecret, licenseKey)
-				}
-			}
-		})
-	}
-}
-
-func TestGetLicenseKeyFromEnv(t *testing.T) {
-	// Save original environment variables
-	originalLicenseKey := os.Getenv(common.EnvLicenseKey)
-	defer func() {
-		if originalLicenseKey != "" {
-			os.Setenv(common.EnvLicenseKey, originalLicenseKey)
-		} else {
-			os.Unsetenv(common.EnvLicenseKey)
-		}
-	}()
-
-	tests := []struct {
-		name            string
-		envLicenseKey   string
-		expectedLicense string
-		expectedError   string
-	}{
-		{
-			name:            "license key from environment variable",
-			envLicenseKey:   "env-license-key",
-			expectedLicense: "env-license-key",
-			expectedError:   "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Set up environment variables
-			if tt.envLicenseKey != "" {
-				os.Setenv(common.EnvLicenseKey, tt.envLicenseKey)
-			} else {
-				os.Unsetenv(common.EnvLicenseKey)
-				os.Unsetenv(common.SecretOCID)
-				os.Unsetenv(common.VaultRegion)
-			}
-
-			licenseKey, err := GetLicenseKey()
-
-			if tt.expectedError != "" {
-				if err == nil {
-					t.Errorf("Expected error containing '%s', but got nil", tt.expectedError)
-				} else if !contains(err.Error(), tt.expectedError) {
-					t.Errorf("Expected error containing '%s', but got '%s'", tt.expectedError, err.Error())
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Expected no error, but got: %v", err)
-				}
-				if licenseKey != tt.expectedLicense {
-					t.Errorf("Expected license key '%s', but got '%s'", tt.expectedLicense, licenseKey)
 				}
 			}
 		})
