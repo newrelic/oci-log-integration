@@ -13,7 +13,7 @@ provider "oci" {
   alias        = "home"
   tenancy_ocid = var.tenancy_ocid
   user_ocid    = data.oci_identity_user.current_user.user_id
-  region       = var.newrelic_region
+  region       = var.region
 }
 
 
@@ -22,7 +22,7 @@ locals {
   freeform_tags = {
     newrelic-terraform = "true"
   }
-   # Names for the network infra
+  # Names for the network infra
   vcn_name        = "${var.newrelic_logging_prefix}-logging-vcn"
   nat_gateway     = "${local.vcn_name}-natgateway"
   service_gateway = "${local.vcn_name}-servicegateway"
@@ -42,7 +42,7 @@ locals {
 resource "oci_functions_application" "logging_function_app" {
   compartment_id = var.compartment_ocid
   config = {
-    "VAULT_REGION"  = var.newrelic_region
+    "VAULT_REGION"  = var.region
     "DEBUG_ENABLED" = var.debug_enabled
   }
   defined_tags               = {}
@@ -65,10 +65,10 @@ resource "oci_functions_function" "logging_function" {
 
   defined_tags  = {}
   freeform_tags = local.freeform_tags
-  image         = "${var.newrelic_region}.ocir.io/idms1yfytybe/oci-testing-registry/oci-function-x86:0.0.1" #TODO to change the actual function name 
+  image         = "${var.region}.ocir.io/idms1yfytybe/oci-testing-registry/oci-function-x86:0.0.1" #TODO to change the actual function name 
   provisioned_concurrency_config {
     strategy = "CONSTANT"
-    count = 20
+    count    = 20
   }
 }
 
@@ -89,7 +89,6 @@ resource "oci_sch_service_connector" "nr_logging_service_connector" {
       content {
         compartment_id = log_sources.value.compartment_id
         log_group_id   = log_sources.value.log_group_id
-        log_id         = log_sources.value.log_id
       }
     }
   }
@@ -134,9 +133,9 @@ module "vcn" {
 
 data "oci_core_route_tables" "default_vcn_route_table" {
   depends_on     = [module.vcn] # Ensure VCN is created before attempting to find its route tables
-  count = var.create_vcn ? 1 : 0
+  count          = var.create_vcn ? 1 : 0
   compartment_id = var.compartment_ocid
-  vcn_id         = module.vcn[0].vcn_id 
+  vcn_id         = module.vcn[0].vcn_id
 
   filter {
     name   = "display_name"
@@ -150,7 +149,7 @@ resource "oci_core_default_route_table" "default_internet_route" {
   manage_default_resource_id = data.oci_core_route_tables.default_vcn_route_table[0].route_tables[0].id
   depends_on = [
     module.vcn,
-    data.oci_core_route_tables.default_vcn_route_table 
+    data.oci_core_route_tables.default_vcn_route_table
   ]
   route_rules {
     destination       = "0.0.0.0/0"
@@ -171,7 +170,7 @@ output "vcn_network_details" {
     service_gateway_id = module.vcn[0].service_gateway_id
     sgw_route_id       = module.vcn[0].sgw_route_id
     subnet_id          = module.vcn[0].subnet_id[local.subnet]
-  } : {
+    } : {
     vcn_id             = ""
     nat_gateway_id     = ""
     nat_route_id       = ""

@@ -4,7 +4,7 @@ data "oci_identity_tenancy" "current_tenancy" {
 
 data "oci_core_subnet" "input_subnet" {
   depends_on = [module.vcn]
-  subnet_id = var.create_vcn ? module.vcn[0].subnet_id[local.subnet] : var.function_subnet_id
+  subnet_id  = var.create_vcn ? module.vcn[0].subnet_id[local.subnet] : var.function_subnet_id
 }
 
 data "oci_resourcemanager_stacks" "current_stack" {

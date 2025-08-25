@@ -9,15 +9,15 @@ def main():
         input_data = json.load(sys.stdin)
         
         # Get payload URL from Terraform input
-        payload_url = input_data.get("payload_url")
+        payload_link = input_data.get("payload_link")
         
-        if not payload_url:
-            sys.stderr.write("Error: payload_url not provided in input\n")
+        if not payload_link:
+            sys.stderr.write("Error: payload_link not provided in input\n")
             sys.exit(1)
         
         # Fetch the payload from URL
         try:
-            response = requests.get(payload_url)
+            response = requests.get(payload_link)
             response.raise_for_status()
             payload_data = response.json()
         except (requests.RequestException, ValueError) as e:

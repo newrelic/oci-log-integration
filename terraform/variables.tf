@@ -13,7 +13,7 @@ variable "newrelic_logging_prefix" {
   description = "The prefix for naming all the logging resources in this module."
 }
 
-variable "newrelic_region" {
+variable "region" {
   type        = string
   description = "The name of the OCI region where these resources will be deployed."
 }
@@ -25,9 +25,9 @@ variable "newrelic_logging_endpoint" {
 }
 
 variable "home_secret_ocid" {
-    type        = string
-    description = "The OCID of the secret in the home region where the New Relic Ingest API key is stored."
-    default = ""
+  type        = string
+  description = "The OCID of the secret in the home region where the New Relic Ingest API key is stored."
+  default     = ""
 }
 
 variable "create_vcn" {
@@ -43,9 +43,9 @@ variable "function_subnet_id" {
 }
 
 variable "payload_link" {
-    type        = string
-    description = "The link to the payload for the connector hubs."
-    default = ""
+  type        = string
+  description = "The link to the payload for the connector hubs."
+  default     = ""
 }
 
 variable "debug_enabled" {

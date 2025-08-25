@@ -14,7 +14,8 @@ variableGroups:
       - ${newrelic_logging_prefix}
       - ${home_secret_ocid}
       - ${payload_link}
-   - title: "Network options"
+
+  - title: "Network options"
     variables:
       - ${create_vcn}
       - ${vcnCompartment}
@@ -36,7 +37,7 @@ variables:
     required: true
     visible: false
 
-  newrelic_region:
+  region:
     type: string
     title: "Region"
     description: "OCI Region as documented at https://docs.cloud.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm"
