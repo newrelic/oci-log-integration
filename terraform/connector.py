@@ -3,9 +3,11 @@ import sys
 import os
 import requests
 
+# This function witll read the S3 pre signed url and parse the JSON object
+# The JSON object will be passed to terraform to create resources.
 def main():
     try:
-        # Read input from stdin (Terraform requirement)
+        # Read input from stdin 
         input_data = json.load(sys.stdin)
         
         # Get payload URL from Terraform input
@@ -28,9 +30,6 @@ def main():
             sys.stderr.write("payload from URL must contain a list of connector configurations.\n")
             sys.exit(1)
 
-        # Process the payload data and build connectors
-        # You can use input_data from Terraform if needed (tenancy_ocid, region, etc.)
-        
         # Output the processed data as a JSON object
         output_payload = {
             "connectors": json.dumps(payload_data)
