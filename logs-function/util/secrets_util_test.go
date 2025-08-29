@@ -110,7 +110,6 @@ func TestGetSecretFromOCIVault(t *testing.T) {
 				secretContent: tt.secretContent,
 			}
 
-			// Handle cases that should panic
 			if tt.secretOCID == "" || tt.vaultRegion == "" {
 				assert.Panics(t, func() {
 					GetSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
@@ -118,7 +117,6 @@ func TestGetSecretFromOCIVault(t *testing.T) {
 				return
 			}
 
-			// Handle normal cases
 			secret, err := GetSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
 
 			if tt.expectedError != "" {
