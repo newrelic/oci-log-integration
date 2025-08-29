@@ -47,7 +47,7 @@ func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nr
 		log.Panicf("Error unmarshalling event: %v", err)
 	}
 
-	channel := make(chan common.DetailedLogsBatch)
+	channel := make(chan common.DetailedLogsBatch, common.MessageChannelSize)
 	var wg sync.WaitGroup
 	wg.Add(common.NumberOfWorkers)
 

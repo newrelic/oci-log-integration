@@ -34,3 +34,6 @@ const MaxPayloadSize = 1 * 1024 * 1024 // 1 mb
 
 // Secret field names
 const LicenseKey = "licenseKey"
+
+// Message channel size
+const MessageChannelSize = 10

@@ -3,7 +3,6 @@ package util
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"os"
 
@@ -28,30 +27,27 @@ type OCISecretsManagerAPI interface {
 func GetSecretFromOCIVault(ctx context.Context, secretsClient OCISecretsManagerAPI, secretOCID string, vaultRegion string) (string, error) {
 	// Check if the passed secret OCID is empty
 	if secretOCID == "" {
-		return "", errors.New("secret OCID is empty")
+		log.Panicf("secret OCID is empty")
 	}
 
 	// Check if the vault region is empty
 	if vaultRegion == "" {
-		return "", errors.New("vault region is empty")
+		log.Panicf("vault region is empty")
 	}
 
 	// Set the region for the secrets client
 	secretsClient.SetRegion(vaultRegion)
 
-	// Create the request to get secret bundle
 	getSecretBundleRequest := secrets.GetSecretBundleRequest{
 		SecretId: ociCommon.String(secretOCID),
 	}
 
-	// Fetch the response from OCI Secrets Manager
 	scResponse, err := secretsClient.GetSecretBundle(ctx, getSecretBundleRequest)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch secret bundle: %w", err)
 	}
 	log.Debug("successfully fetched secret from OCI vault")
 
-	// Extract the secret content
 	secretContent, ok := scResponse.SecretBundleContent.(secrets.Base64SecretBundleContentDetails)
 	if !ok {
 		log.WithField("secretOCID", secretOCID).Error("unexpected secret content type")
@@ -104,17 +100,14 @@ func GetLicenseKey() (key string, err error) {
 func GetLicenseKeyWithContext(ctx context.Context) (key string, err error) {
 	log.Debug("fetching license key from OCI vault")
 
-	// Get secret OCID and vault region from environment
 	secretOCID := os.Getenv(common.SecretOCID)
 	vaultRegion := os.Getenv(common.VaultRegion)
 
-	// Create OCI secrets client
 	secretsClient, err := NewOCISecretsManagerClient()
 	if err != nil {
 		return "", err
 	}
 
-	// Get the secret from OCI vault
 	secretValue, err := GetSecretFromOCIVault(ctx, secretsClient, secretOCID, vaultRegion)
 	if err != nil {
 		return "", err

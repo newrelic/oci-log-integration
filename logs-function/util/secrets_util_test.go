@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/oracle/oci-go-sdk/v65/secrets"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/newrelic/oci-log-integration/logs-function/common"
 )
@@ -18,8 +19,8 @@ type mockOCISecretsClient struct {
 	shouldError     bool
 	secretContent   string
 	region          string
-	forceNilContent bool 
-	invalidBase64   bool 
+	forceNilContent bool
+	invalidBase64   bool
 }
 
 func (m *mockOCISecretsClient) GetSecretBundle(ctx context.Context, request secrets.GetSecretBundleRequest) (secrets.GetSecretBundleResponse, error) {
@@ -28,7 +29,7 @@ func (m *mockOCISecretsClient) GetSecretBundle(ctx context.Context, request secr
 	}
 
 	var content *string
-	
+
 	if m.forceNilContent {
 		content = nil
 	} else if m.invalidBase64 {
@@ -109,6 +110,15 @@ func TestGetSecretFromOCIVault(t *testing.T) {
 				secretContent: tt.secretContent,
 			}
 
+			// Handle cases that should panic
+			if tt.secretOCID == "" || tt.vaultRegion == "" {
+				assert.Panics(t, func() {
+					GetSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
+				}, "Expected panic for %s", tt.name)
+				return
+			}
+
+			// Handle normal cases
 			secret, err := GetSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
 
 			if tt.expectedError != "" {
