@@ -27,6 +27,9 @@ func ProcessLogs(OCILoggingEvent common.OCILoggingEvent, channel chan common.Det
 	return nil
 }
 
+// splitLogsIntoBatches splits the incoming logs into batches for processing.
+// It loosely respects (if a single log entry exceeds the maximum payload size we still try to send it) 
+// the maximum payload size and sends each batch through the provided channel.
 func splitLogsIntoBatches(logs common.OCILoggingEvent, maxPayloadSize int, commonAttributes common.LogAttributes, channel chan common.DetailedLogsBatch) error {
 	var currentBatch common.LogData
 	currentBatchSize := 0
@@ -34,15 +37,20 @@ func splitLogsIntoBatches(logs common.OCILoggingEvent, maxPayloadSize int, commo
 	for _, logData := range logs {
 		logBytes, err := json.Marshal(logData)
 		if err != nil {
-			log.Debugf("Warning: Could not marshal detailed log for size estimation: %v", err)
+			log.Warnf("Warning: Could not marshal detailed log for size estimation: %v", err)
 			continue
 		}
 		logSize := len(logBytes)
 
-		if currentBatchSize+logSize > maxPayloadSize && len(currentBatch) > 0 {
+		// this case handles the case where a single log entry is larger than the maxpayload size.
+		// In this case OCI has a 1MB limit per log line, we try to push this to New Relic anyway
+		if len(currentBatch) == 0 {
 			currentBatch = common.LogData{logData}
 			currentBatchSize = logSize
+		} else if currentBatchSize+logSize > maxPayloadSize && len(currentBatch) > 0 {
 			util.ProduceMessageToChannel(channel, currentBatch, commonAttributes)
+			currentBatch = common.LogData{logData}
+			currentBatchSize = logSize
 		} else {
 			currentBatch = append(currentBatch, logData)
 			currentBatchSize += logSize

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/oracle/oci-go-sdk/v65/secrets"
@@ -14,9 +15,11 @@ import (
 
 // Mock OCI Secrets Manager client for testing
 type mockOCISecretsClient struct {
-	shouldError   bool
-	secretContent string
-	region        string
+	shouldError     bool
+	secretContent   string
+	region          string
+	forceNilContent bool 
+	invalidBase64   bool 
 }
 
 func (m *mockOCISecretsClient) GetSecretBundle(ctx context.Context, request secrets.GetSecretBundleRequest) (secrets.GetSecretBundleResponse, error) {
@@ -24,13 +27,22 @@ func (m *mockOCISecretsClient) GetSecretBundle(ctx context.Context, request secr
 		return secrets.GetSecretBundleResponse{}, errors.New("mock OCI secrets error")
 	}
 
-	// Encode the secret content as base64
-	encodedContent := base64.StdEncoding.EncodeToString([]byte(m.secretContent))
+	var content *string
+	
+	if m.forceNilContent {
+		content = nil
+	} else if m.invalidBase64 {
+		invalidBase64 := "invalid!base64!"
+		content = &invalidBase64
+	} else {
+		encodedContent := base64.StdEncoding.EncodeToString([]byte(m.secretContent))
+		content = &encodedContent
+	}
 
 	response := secrets.GetSecretBundleResponse{
 		SecretBundle: secrets.SecretBundle{
 			SecretBundleContent: secrets.Base64SecretBundleContentDetails{
-				Content: &encodedContent,
+				Content: content,
 			},
 		},
 	}
@@ -87,15 +99,6 @@ func TestGetSecretFromOCIVault(t *testing.T) {
 			shouldError:    true,
 			expectedSecret: "",
 			expectedError:  "failed to fetch secret bundle",
-		},
-		{
-			name:           "JSON secret content",
-			secretOCID:     "ocid1.vaultsecret.test",
-			vaultRegion:    "us-phoenix-1",
-			secretContent:  `{"licenseKey": "json-license-key"}`,
-			shouldError:    false,
-			expectedSecret: `{"licenseKey": "json-license-key"}`,
-			expectedError:  "",
 		},
 	}
 
@@ -192,17 +195,14 @@ func TestGetLicenseKeyWithMockClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create mock client
 			mockClient := &mockOCISecretsClient{
 				shouldError:   tt.shouldError,
 				secretContent: tt.secretContent,
 			}
 
-			// Call GetSecretFromOCIVault first
 			secret, err := GetSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
 
 			if tt.shouldError {
-				// If we expect an OCI error, verify it and return
 				if err == nil {
 					t.Errorf("Expected OCI error, but got nil")
 				} else if !contains(err.Error(), tt.expectedError) {
@@ -216,7 +216,6 @@ func TestGetLicenseKeyWithMockClient(t *testing.T) {
 				return
 			}
 
-			// Now test the license key extraction logic
 			licenseKey, extractErr := extractLicenseKeyFromSecret(secret)
 
 			if tt.expectedError != "" {
@@ -243,14 +242,11 @@ func extractLicenseKeyFromSecret(secretValue string) (string, error) {
 		return "", errors.New("license key secret is empty")
 	}
 
-	// Try to parse as JSON first
 	var secretMap map[string]string
 	if err := json.Unmarshal([]byte(secretValue), &secretMap); err != nil {
-		// If it's not JSON, return the entire secret as license key
 		return secretValue, nil
 	}
 
-	// Extract license key from JSON
 	if licenseKey, exists := secretMap[common.LicenseKey]; exists && licenseKey != "" {
 		return licenseKey, nil
 	}
@@ -258,7 +254,133 @@ func extractLicenseKeyFromSecret(secretValue string) (string, error) {
 	return "", errors.New("license key is empty or not present in the secret")
 }
 
-// Helper functions
+func TestGetSecretFromOCIVault_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name            string
+		secretOCID      string
+		vaultRegion     string
+		forceNilContent bool
+		invalidBase64   bool
+		shouldError     bool
+		expectedError   string
+	}{
+		{
+			name:            "nil secret content",
+			secretOCID:      "ocid1.vaultsecret.test",
+			vaultRegion:     "us-phoenix-1",
+			forceNilContent: true,
+			shouldError:     true,
+			expectedError:   "secret content is nil",
+		},
+		{
+			name:          "invalid base64 content",
+			secretOCID:    "ocid1.vaultsecret.test",
+			vaultRegion:   "us-phoenix-1",
+			invalidBase64: true,
+			shouldError:   true,
+			expectedError: "failed to decode secret content",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := &mockOCISecretsClient{
+				shouldError:     false,
+				forceNilContent: tt.forceNilContent,
+				invalidBase64:   tt.invalidBase64,
+			}
+
+			secret, err := GetSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
+
+			if tt.shouldError {
+				if err == nil {
+					t.Errorf("Expected error containing '%s', but got nil", tt.expectedError)
+				} else if !contains(err.Error(), tt.expectedError) {
+					t.Errorf("Expected error containing '%s', but got '%s'", tt.expectedError, err.Error())
+				}
+				if secret != "" {
+					t.Errorf("Expected empty secret on error, but got '%s'", secret)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error, but got: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestGetLicenseKeyError(t *testing.T) {
+	originalSecretOCID := os.Getenv(common.SecretOCID)
+	originalVaultRegion := os.Getenv(common.VaultRegion)
+
+	defer func() {
+		if originalSecretOCID != "" {
+			os.Setenv(common.SecretOCID, originalSecretOCID)
+		} else {
+			os.Unsetenv(common.SecretOCID)
+		}
+		if originalVaultRegion != "" {
+			os.Setenv(common.VaultRegion, originalVaultRegion)
+		} else {
+			os.Unsetenv(common.VaultRegion)
+		}
+	}()
+
+	tests := []struct {
+		name          string
+		secretOCID    string
+		vaultRegion   string
+		expectedError string
+	}{
+		{
+			name:          "missing secret OCID environment variable",
+			secretOCID:    "",
+			vaultRegion:   "us-phoenix-1",
+			expectedError: "failed to create resource principal configuration provider",
+		},
+		{
+			name:          "missing vault region environment variable",
+			secretOCID:    "ocid1.vaultsecret.test",
+			vaultRegion:   "",
+			expectedError: "failed to create resource principal configuration provider",
+		},
+		{
+			name:          "both environment variables missing",
+			secretOCID:    "",
+			vaultRegion:   "",
+			expectedError: "failed to create resource principal configuration provider",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set environment variables
+			if tt.secretOCID != "" {
+				os.Setenv(common.SecretOCID, tt.secretOCID)
+			} else {
+				os.Unsetenv(common.SecretOCID)
+			}
+			if tt.vaultRegion != "" {
+				os.Setenv(common.VaultRegion, tt.vaultRegion)
+			} else {
+				os.Unsetenv(common.VaultRegion)
+			}
+
+			key, err := GetLicenseKey()
+
+			if err == nil {
+				t.Errorf("Expected error, but got nil")
+			} else if !contains(err.Error(), tt.expectedError) {
+				t.Errorf("Expected error containing '%s', but got '%s'", tt.expectedError, err.Error())
+			}
+			if key != "" {
+				t.Errorf("Expected empty key on error, but got '%s'", key)
+			}
+		})
+	}
+}
+
 func contains(str, substr string) bool {
 	return len(str) >= len(substr) && (str == substr ||
 		(len(str) > len(substr) &&

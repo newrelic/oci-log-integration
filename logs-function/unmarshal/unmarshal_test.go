@@ -152,7 +152,7 @@ func TestUnmarshalComplexOCILoggingEvent(t *testing.T) {
 				},
 				"cache": map[string]interface{}{
 					"key": "user-profile-123",
-					"ttl": float64(3600), // JSON numbers become float64
+					"ttl": float64(3600),
 				},
 				"metadata": map[string]interface{}{
 					"size":        "2.4MB",

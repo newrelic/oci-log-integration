@@ -80,39 +80,31 @@ func TestProcessLogs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a buffered channel to capture batches
 			channel := make(chan common.DetailedLogsBatch, 10)
 
-			// Call ProcessLogs
 			err := ProcessLogs(tt.ociLoggingEvent, channel)
 
-			// Verify no error occurred
 			assert.NoError(t, err, tt.description)
 
-			// Close channel and collect all batches
 			close(channel)
 			var batches []common.DetailedLogsBatch
 			for batch := range channel {
 				batches = append(batches, batch)
 			}
 
-			// Verify expected number of batches
 			assert.Len(t, batches, tt.expectedBatches, "Expected %d batches, got %d", tt.expectedBatches, len(batches))
 
-			// Verify attributes if batches were created
 			if tt.expectedBatches > 0 && len(batches) > 0 {
 				for _, batch := range batches {
 					assert.Len(t, batch, 1, "Each batch should contain one DetailedLog")
 					detailedLog := batch[0]
 
-					// Verify attributes
 					for key, expectedValue := range tt.expectedAttributes {
 						actualValue, exists := detailedLog.CommonData.Attributes[key]
 						assert.True(t, exists, "Attribute %s should exist", key)
 						assert.Equal(t, expectedValue, actualValue, "Attribute %s should have correct value", key)
 					}
 
-					// Verify entries
 					assert.NotEmpty(t, detailedLog.Entries, "DetailedLog should have entries")
 				}
 			}
@@ -177,8 +169,8 @@ func TestSplitLogsIntoBatches(t *testing.T) {
 					"message": "Yet another message to ensure we create multiple batches",
 				},
 			},
-			maxPayloadSize:  100, // Small size to force multiple batches
-			expectedBatches: 3,   // Each log will be in its own batch
+			maxPayloadSize:  100,
+			expectedBatches: 3,
 			description:     "Logs exceeding payload size should create multiple batches",
 		},
 		{
@@ -192,31 +184,24 @@ func TestSplitLogsIntoBatches(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create buffered channel to capture batches
 			channel := make(chan common.DetailedLogsBatch, 10)
 
-			// Create common attributes
 			commonAttributes := common.LogAttributes{
 				"test.attribute": "test.value",
 			}
 
-			// Call splitLogsIntoBatches
 			err := splitLogsIntoBatches(tt.logs, tt.maxPayloadSize, commonAttributes, channel)
 
-			// Verify no error occurred
 			assert.NoError(t, err, tt.description)
 
-			// Close channel and collect all batches
 			close(channel)
 			var batches []common.DetailedLogsBatch
 			for batch := range channel {
 				batches = append(batches, batch)
 			}
 
-			// Verify expected number of batches
 			assert.Len(t, batches, tt.expectedBatches, "Expected %d batches, got %d", tt.expectedBatches, len(batches))
 
-			// Verify all logs are included across batches
 			if tt.expectedBatches > 0 {
 				totalLogs := 0
 				for _, batch := range batches {
@@ -224,7 +209,6 @@ func TestSplitLogsIntoBatches(t *testing.T) {
 					detailedLog := batch[0]
 					totalLogs += len(detailedLog.Entries)
 
-					// Verify attributes are set
 					assert.Equal(t, "test.value", detailedLog.CommonData.Attributes["test.attribute"])
 				}
 				assert.Equal(t, len(tt.logs), totalLogs, "All logs should be included across batches")
@@ -235,14 +219,13 @@ func TestSplitLogsIntoBatches(t *testing.T) {
 
 // TestSplitLogsIntoBatchesPayloadSizeAccuracy tests payload size calculation accuracy
 func TestSplitLogsIntoBatchesPayloadSizeAccuracy(t *testing.T) {
-	// Create logs with known sizes
 	logs := common.OCILoggingEvent{
 		map[string]interface{}{
 			"msg": "a",
-		}, // Small log
+		}, 
 		map[string]interface{}{
 			"message": "This is a medium-sized log entry that should fit within reasonable payload limits",
-		}, // Medium log
+		},
 	}
 
 	channel := make(chan common.DetailedLogsBatch, 10)
@@ -250,7 +233,6 @@ func TestSplitLogsIntoBatchesPayloadSizeAccuracy(t *testing.T) {
 		"test": "value",
 	}
 
-	// Use a size that should allow the first log but not both
 	err := splitLogsIntoBatches(logs, 50, commonAttributes, channel)
 	assert.NoError(t, err)
 
@@ -260,7 +242,6 @@ func TestSplitLogsIntoBatchesPayloadSizeAccuracy(t *testing.T) {
 		batches = append(batches, batch)
 	}
 
-	// Should create 2 batches since the second log exceeds the size limit
 	assert.Len(t, batches, 2, "Should create 2 batches due to payload size limits")
 }
 
@@ -281,11 +262,9 @@ func TestProcessLogsWithChannel(t *testing.T) {
 
 	channel := make(chan common.DetailedLogsBatch, 5)
 
-	// Process logs
 	err := ProcessLogs(logs, channel)
 	assert.NoError(t, err)
 
-	// Test that we can receive from the channel without blocking
 	select {
 	case batch := <-channel:
 		assert.NotEmpty(t, batch, "Should receive a non-empty batch")
@@ -324,7 +303,6 @@ func TestProcessLogsAttributes(t *testing.T) {
 	assert.Len(t, batch, 1)
 	detailedLog := batch[0]
 
-	// Verify all expected instrumentation attributes
 	expectedAttributes := map[string]interface{}{
 		"instrumentation.provider": common.InstrumentationProvider,
 		"instrumentation.name":     common.InstrumentationName,
@@ -337,6 +315,5 @@ func TestProcessLogsAttributes(t *testing.T) {
 		assert.Equal(t, expectedValue, actualValue, "Attribute %s should have correct value", key)
 	}
 
-	// Verify only expected attributes are present (no extra attributes)
 	assert.Len(t, detailedLog.CommonData.Attributes, len(expectedAttributes), "Should only have expected attributes")
 }

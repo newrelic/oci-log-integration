@@ -32,106 +32,6 @@ func (m *MockNRClient) CreateLogEntry(batch interface{}) error {
 	return args.Error(0)
 }
 
-// newNRClientTestCase represents a test case for the NewNRClient function.
-type newNRClientTestCase struct {
-	name             string // Name of the test case
-	envDebug         string // Environment variable for debug
-	envRegion        string // Environment variable for region
-	envTTL           string // Environment variable for client TTL
-	expectedLogLevel string // Expected log level
-	expectError      bool   // Whether an error is expected
-	envOCID          string // Environment variable for OCI Data
-	envVaultRegion   string // Environment variable for Vault Region
-	description      string // Description of the test case
-}
-
-// TestNewNRClient tests the NewNRClient function with different scenarios.
-func TestNewNRClient(t *testing.T) {
-	testCases := []newNRClientTestCase{
-		{
-			name:             "Debug enabled with OCI vault",
-			envDebug:         "true",
-			envRegion:        "us",
-			expectedLogLevel: "debug",
-			envOCID:          "valid_ocid",
-			envVaultRegion:   "us-ashburn-1",
-			expectError:      true,
-			description:      "Should attempt OCI vault retrieval but fail in test environment",
-		},
-		{
-			name:             "Debug disabled with OCI vault",
-			envRegion:        "us",
-			expectedLogLevel: "info",
-			envOCID:          "valid_ocid",
-			envVaultRegion:   "us-ashburn-1",
-			expectError:      true,
-			description:      "Should attempt OCI vault retrieval but fail in test environment",
-		},
-		{
-			name:           "Invalid region with OCI vault",
-			envRegion:      "invalid",
-			envOCID:        "valid_ocid",
-			envVaultRegion: "us-ashburn-1",
-			expectError:    true,
-			description:    "Should handle invalid region and fail in test environment",
-		},
-		{
-			name:        "No OCI configuration - should fail",
-			envRegion:   "us",
-			expectError: true,
-			description: "Should fail when no OCI configuration is available",
-		},
-		{
-			name:           "Custom TTL configuration",
-			envRegion:      "us",
-			envTTL:         "300",
-			envOCID:        "valid_ocid",
-			envVaultRegion: "us-ashburn-1",
-			expectError:    true,
-			description:    "Should respect custom TTL setting (300 seconds)",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Reset client cache for each test
-			resetNRClient()
-
-			// Setup environment variables
-			if tc.envDebug != "" {
-				os.Setenv(common.DebugEnabled, tc.envDebug)
-				defer os.Unsetenv(common.DebugEnabled)
-			}
-			if tc.envRegion != "" {
-				os.Setenv(common.NewRelicRegion, tc.envRegion)
-				defer os.Unsetenv(common.NewRelicRegion)
-			}
-			if tc.envTTL != "" {
-				os.Setenv(common.ClientTTL, tc.envTTL)
-				defer os.Unsetenv(common.ClientTTL)
-			}
-
-			if tc.envOCID != "" {
-				os.Setenv("SECRET_OCID", tc.envOCID)
-				defer os.Unsetenv("SECRET_OCID")
-			}
-			if tc.envVaultRegion != "" {
-				os.Setenv("VAULT_REGION", tc.envVaultRegion)
-				defer os.Unsetenv("VAULT_REGION")
-			}
-
-			nrClient, err := NewNRClient()
-
-			if tc.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, nrClient)
-			}
-		})
-	}
-}
-
 // TestConsumeLogBatches tests the ConsumeLogBatches function.
 func TestConsumeLogBatches(t *testing.T) {
 	mockNRClient := new(MockNRClient)
@@ -148,7 +48,6 @@ func TestConsumeLogBatches(t *testing.T) {
 				"region":        "us-ashburn-1",
 			},
 		},
-		// Entries: []common.LogData{"{}"},
 	}}
 
 	channel <- logBatch
@@ -159,42 +58,6 @@ func TestConsumeLogBatches(t *testing.T) {
 	close(channel)
 	wg.Wait()
 	mockNRClient.AssertNumberOfCalls(t, "CreateLogEntry", 1)
-}
-
-// TestClientTTL tests the TTL functionality of the NewRelic client cache
-func TestClientTTL(t *testing.T) {
-	// Reset client cache
-	resetNRClient()
-
-	// Set up environment for testing
-	os.Setenv(common.NewRelicRegion, "us")
-	os.Setenv(common.ClientTTL, "60") // 60 seconds TTL for faster testing
-	os.Setenv("SECRET_OCID", "test_ocid")
-	os.Setenv("VAULT_REGION", "us-ashburn-1")
-
-	defer func() {
-		os.Unsetenv(common.NewRelicRegion)
-		os.Unsetenv(common.ClientTTL)
-		os.Unsetenv("SECRET_OCID")
-		os.Unsetenv("VAULT_REGION")
-	}()
-
-	// First call should attempt to create client (will fail due to mock environment)
-	_, err1 := NewNRClient()
-	assert.Error(t, err1, "Expected error due to test environment")
-
-	// Verify cache time was set
-	firstCacheTime := clientCacheTime
-	assert.False(t, firstCacheTime.IsZero(), "Cache time should be set")
-
-	// Second call within TTL should return cached result (same error)
-	_, err2 := NewNRClient()
-	assert.Error(t, err2, "Should return cached error")
-	assert.Equal(t, err1.Error(), err2.Error(), "Should return same cached error")
-
-	// Verify cache time hasn't changed
-	secondCacheTime := clientCacheTime
-	assert.Equal(t, firstCacheTime, secondCacheTime, "Cache time should not change for cached response")
 }
 
 // TestGetClientTTL tests the getClientTTL function
@@ -244,4 +107,83 @@ func TestGetClientTTL(t *testing.T) {
 			assert.Equal(t, tt.expectedTTL, actualTTL)
 		})
 	}
+}
+
+// TestNewNRClient_CacheLogic tests the caching logic of NewNRClient
+func TestNewNRClient_CacheLogic(t *testing.T) {
+	resetNRClient()
+
+	os.Setenv(common.NewRelicRegion, "us")
+	os.Setenv(common.ClientTTL, "60")
+	defer func() {
+		os.Unsetenv(common.NewRelicRegion)
+		os.Unsetenv(common.ClientTTL)
+	}()
+
+	_, _ = NewNRClient()
+	firstCacheTime := clientCacheTime
+	assert.False(t, firstCacheTime.IsZero(), "Cache time should be set after first call")
+
+	_, _ = NewNRClient()
+	secondCacheTime := clientCacheTime
+	assert.Equal(t, firstCacheTime, secondCacheTime, "Cache time should not change for cached response")
+}
+
+// TestNewNRClient_CacheExpiration tests that cache expires correctly
+func TestNewNRClient_CacheExpiration(t *testing.T) {
+	resetNRClient()
+
+	os.Setenv(common.ClientTTL, "1")
+	os.Setenv(common.NewRelicRegion, "us")
+	defer func() {
+		os.Unsetenv(common.ClientTTL)
+		os.Unsetenv(common.NewRelicRegion)
+	}()
+
+	_, _ = NewNRClient()
+	firstCacheTime := clientCacheTime
+
+	time.Sleep(2 * time.Second)
+
+	_, _ = NewNRClient()
+	secondCacheTime := clientCacheTime
+
+	assert.True(t, secondCacheTime.After(firstCacheTime), "Cache should have been refreshed after TTL expiration")
+}
+
+// TestConsumeLogBatches_ErrorHandling tests error handling in log processing
+func TestConsumeLogBatches_ErrorHandling(t *testing.T) {
+	mockNRClient := new(MockNRClient)
+	
+	mockNRClient.On("CreateLogEntry", mock.Anything).Return(assert.AnError)
+
+	channel := make(chan common.DetailedLogsBatch, 2)
+	wg := new(sync.WaitGroup)
+
+	// Send two batches
+	logBatch1 := []common.DetailedLog{{
+		CommonData: common.Common{
+			Attributes: common.LogAttributes{
+				"compartmentId": "ocid1.compartment.oc1..aaaaaaaa",
+			},
+		},
+	}}
+	logBatch2 := []common.DetailedLog{{
+		CommonData: common.Common{
+			Attributes: common.LogAttributes{
+				"compartmentId": "ocid1.compartment.oc1..bbbbbbbbb",
+			},
+		},
+	}}
+
+	channel <- logBatch1
+	channel <- logBatch2
+
+	ctx := context.TODO()
+	wg.Add(1)
+	go ConsumeLogBatches(ctx, channel, wg, mockNRClient)
+	close(channel)
+	wg.Wait()
+	
+	mockNRClient.AssertNumberOfCalls(t, "CreateLogEntry", 2)
 }

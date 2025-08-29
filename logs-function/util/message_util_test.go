@@ -9,10 +9,8 @@ import (
 
 // TestProduceMessageToChannel tests the ProduceMessageToChannel function
 func TestProduceMessageToChannel(t *testing.T) {
-	// Create a channel for DetailedLogsBatch
-	channel := make(chan common.DetailedLogsBatch, 1) // Buffered channel
+	channel := make(chan common.DetailedLogsBatch, 1) 
 
-	// Create a sample log data and attributes
 	currentBatch := common.LogData{
 		map[string]interface{}{
 			"message": map[string]interface{}{
@@ -45,6 +43,5 @@ func TestProduceMessageToChannel(t *testing.T) {
 
 	assert.Equal(t, expectedDetailedLog, receivedDetailedLog)
 
-	// Close the channel
 	close(channel)
 }

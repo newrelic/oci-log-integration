@@ -32,8 +32,7 @@ func handleFunction(ctx context.Context, in io.Reader, out io.Writer) {
 	// Create NewRelic client during function invocation, not startup
 	nrClient, err := util.NewNRClient()
 	if err != nil {
-		log.Errorf("error initializing newrelic client: %v", err)
-		return
+		log.Panicf("error initializing newrelic client: %v", err)
 	}
 	
 	handleFunctionWithClient(ctx, in, out, nrClient)
@@ -45,8 +44,7 @@ func handleFunction(ctx context.Context, in io.Reader, out io.Writer) {
 func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nrClient util.NewRelicClientAPI) {
 	event := unmarshal.Event{}
 	if err := event.Unmarshal(in); err != nil {
-		log.Errorf("Error unmarshalling event: %v", err)
-		return
+		log.Panicf("Error unmarshalling event: %v", err)
 	}
 
 	channel := make(chan common.DetailedLogsBatch)

@@ -26,8 +26,7 @@ type Event struct {
 func (event *Event) Unmarshal(in io.Reader) error {
 	payloadBytes, err := io.ReadAll(in)
 	if err != nil {
-		log.Errorf("Error reading incoming payload: %v\n", err)
-		return nil
+		log.Panicf("Error reading incoming payload: %v\n", err)
 	}
 
 	var incomingLogEvent common.OCILoggingEvent
@@ -35,7 +34,7 @@ func (event *Event) Unmarshal(in io.Reader) error {
 		event.EventType = OCI_LOGGING
 		event.OCILoggingEvent = incomingLogEvent
 	} else {
-		log.Errorf("Error decoding incoming log events payload: %v", err)
+		log.Panicf("Error decoding incoming log events payload: %v", err)
 	}
 
 	return nil
