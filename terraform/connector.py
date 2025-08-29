@@ -32,7 +32,7 @@ def main():
 
         # Output the processed data as a JSON object
         output_payload = {
-            "connectors": json.dumps(payload_data)
+            "connectors": payload_data
         }
 
         json.dump(output_payload, sys.stdout)

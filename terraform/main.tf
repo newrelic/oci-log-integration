@@ -16,14 +16,13 @@ provider "oci" {
   region       = var.region
 }
 
-
 locals {
 
   freeform_tags = {
     newrelic-terraform = "true"
   }
   # Names for the network infra
-  vcn_name        = "${var.newrelic_logging_prefix}-logging-vcn"
+  vcn_name        = "${var.newrelic_logging_prefix}-${var.region}-logging-vcn"
   nat_gateway     = "${local.vcn_name}-natgateway"
   service_gateway = "${local.vcn_name}-servicegateway"
   subnet          = "${local.vcn_name}-public-subnet"
@@ -34,19 +33,17 @@ locals {
   }
 }
 
-
-
-
-
 #Resource for the logging function application
 resource "oci_functions_application" "logging_function_app" {
   compartment_id = var.compartment_ocid
   config = {
-    "VAULT_REGION"  = var.region
-    "DEBUG_ENABLED" = var.debug_enabled
+    "VAULT_REGION"     = var.region
+    "DEBUG_ENABLED"    = var.debug_enabled
+    "SECRET_OCID"      = var.home_secret_ocid
+    "CLIENT_TTL"       = "30"
   }
   defined_tags               = {}
-  display_name               = "${var.newrelic_logging_prefix}-logging-function-app"
+  display_name               = "${var.newrelic_logging_prefix}-${var.region}-logging-function-app"
   freeform_tags              = local.freeform_tags
   network_security_group_ids = []
   shape                      = "GENERIC_X86"
@@ -65,7 +62,7 @@ resource "oci_functions_function" "logging_function" {
 
   defined_tags  = {}
   freeform_tags = local.freeform_tags
-  image         = "${var.region}.ocir.io/idms1yfytybe/oci-testing-registry/oci-function-x86:0.0.1" #TODO to change the actual function name 
+  image         = "${var.region}.ocir.io/idfmbxeaoavl/testing-registry/oci-function-test:0.0.1" #TODO to change the actual function name 
   provisioned_concurrency_config {
     strategy = "CONSTANT"
     count    = 20
