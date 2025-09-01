@@ -22,9 +22,9 @@ type OCISecretsManagerAPI interface {
 	SetRegion(regionId string)
 }
 
-// GetSecretFromOCIVault retrieves a secret from OCI Vault.
+// getSecretFromOCIVault retrieves a secret from OCI Vault.
 // It returns the secret string and an error if any.
-func GetSecretFromOCIVault(ctx context.Context, secretsClient OCISecretsManagerAPI, secretOCID string, vaultRegion string) (string, error) {
+func getSecretFromOCIVault(ctx context.Context, secretsClient OCISecretsManagerAPI, secretOCID string, vaultRegion string) (string, error) {
 	// Check if the passed secret OCID is empty
 	if secretOCID == "" {
 		log.Panicf("secret OCID is empty")
@@ -68,7 +68,7 @@ func GetSecretFromOCIVault(ctx context.Context, secretsClient OCISecretsManagerA
 	return string(decodedSecret), nil
 }
 
-// NewOCISecretsManagerClient creates a new OCI Secrets Manager client.
+// newOCISecretsManagerClient creates a new OCI Secrets Manager client.
 // It returns an OCISecretsManagerAPI client and an error if any.
 func newOCISecretsManagerClient() (OCISecretsManagerAPI, error) {
 	var provider ociCommon.ConfigurationProvider
@@ -103,7 +103,7 @@ func GetLicenseKey() (key string, err error) {
 		return "", err
 	}
 
-	secretValue, err := GetSecretFromOCIVault(ctx, secretsClient, secretOCID, vaultRegion)
+	secretValue, err := getSecretFromOCIVault(ctx, secretsClient, secretOCID, vaultRegion)
 	if err != nil {
 		return "", err
 	}

@@ -27,7 +27,7 @@ func ProcessLogs(OCILoggingEvent common.OCILoggingEvent, channel chan common.Det
 // splitLogsIntoBatches splits the incoming logs into batches for processing.
 // It loosely respects (if a single log entry exceeds the maximum payload size we still try to send it) 
 // the maximum payload size and sends each batch through the provided channel.
-func splitLogsIntoBatches(logs common.OCILoggingEvent, maxPayloadSize int, commonAttributes common.LogAttributes, channel chan common.DetailedLogsBatch) error {
+func splitLogsIntoBatches(logs common.OCILoggingEvent, maxPayloadSize int, commonAttributes common.LogAttributes, channel chan common.DetailedLogsBatch) {
 	var currentBatch common.LogData
 	currentBatchSize := 0
 
@@ -58,5 +58,5 @@ func splitLogsIntoBatches(logs common.OCILoggingEvent, maxPayloadSize int, commo
 		util.ProduceMessageToChannel(channel, currentBatch, commonAttributes)
 	}
 
-	return nil
+	// return nil
 }

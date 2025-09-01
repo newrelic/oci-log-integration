@@ -112,12 +112,12 @@ func TestGetSecretFromOCIVault(t *testing.T) {
 
 			if tt.secretOCID == "" || tt.vaultRegion == "" {
 				assert.Panics(t, func() {
-					GetSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
+					getSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
 				}, "Expected panic for %s", tt.name)
 				return
 			}
 
-			secret, err := GetSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
+			secret, err := getSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
 
 			if tt.expectedError != "" {
 				if err == nil {
@@ -208,7 +208,7 @@ func TestGetLicenseKeyWithMockClient(t *testing.T) {
 				secretContent: tt.secretContent,
 			}
 
-			secret, err := GetSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
+			secret, err := getSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
 
 			if tt.shouldError {
 				if err == nil {
@@ -298,7 +298,7 @@ func TestGetSecretFromOCIVault_EdgeCases(t *testing.T) {
 				invalidBase64:   tt.invalidBase64,
 			}
 
-			secret, err := GetSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
+			secret, err := getSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
 
 			if tt.shouldError {
 				if err == nil {

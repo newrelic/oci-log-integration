@@ -188,9 +188,7 @@ func TestSplitLogsIntoBatches(t *testing.T) {
 				"test.attribute": "test.value",
 			}
 
-			err := splitLogsIntoBatches(tt.logs, tt.maxPayloadSize, commonAttributes, channel)
-
-			assert.NoError(t, err, tt.description)
+			splitLogsIntoBatches(tt.logs, tt.maxPayloadSize, commonAttributes, channel)
 
 			close(channel)
 			var batches []common.DetailedLogsBatch
@@ -231,8 +229,7 @@ func TestSplitLogsIntoBatchesPayloadSizeAccuracy(t *testing.T) {
 		"test": "value",
 	}
 
-	err := splitLogsIntoBatches(logs, 50, commonAttributes, channel)
-	assert.NoError(t, err)
+	splitLogsIntoBatches(logs, 50, commonAttributes, channel)
 
 	close(channel)
 	var batches []common.DetailedLogsBatch
