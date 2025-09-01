@@ -7,7 +7,6 @@ import (
 	"github.com/newrelic/oci-log-integration/logs-function/common"
 	"github.com/newrelic/oci-log-integration/logs-function/logger"
 	"github.com/newrelic/oci-log-integration/logs-function/util"
-	// "time"
 )
 
 var log = logger.NewLogrusLogger(logger.WithDebugLevel())
@@ -15,7 +14,7 @@ var log = logger.NewLogrusLogger(logger.WithDebugLevel())
 // ProcessLogs processes OCI logging events and splits them into batches for New Relic ingestion.
 // It adds instrumentation metadata to each batch and sends the batches through the provided channel.
 // The function respects payload size limits to ensure compatibility with New Relic's API constraints.
-func ProcessLogs(OCILoggingEvent common.OCILoggingEvent, channel chan common.DetailedLogsBatch) error {
+func ProcessLogs(OCILoggingEvent common.OCILoggingEvent, channel chan common.DetailedLogsBatch) {
 	attributes := common.LogAttributes{
 		"instrumentation.provider": common.InstrumentationProvider,
 		"instrumentation.name":     common.InstrumentationName,
@@ -23,8 +22,6 @@ func ProcessLogs(OCILoggingEvent common.OCILoggingEvent, channel chan common.Det
 	}
 
 	splitLogsIntoBatches(OCILoggingEvent, common.MaxPayloadSize, attributes, channel)
-
-	return nil
 }
 
 // splitLogsIntoBatches splits the incoming logs into batches for processing.

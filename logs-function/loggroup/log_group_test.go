@@ -82,9 +82,7 @@ func TestProcessLogs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			channel := make(chan common.DetailedLogsBatch, 10)
 
-			err := ProcessLogs(tt.ociLoggingEvent, channel)
-
-			assert.NoError(t, err, tt.description)
+			ProcessLogs(tt.ociLoggingEvent, channel)
 
 			close(channel)
 			var batches []common.DetailedLogsBatch
@@ -262,8 +260,7 @@ func TestProcessLogsWithChannel(t *testing.T) {
 
 	channel := make(chan common.DetailedLogsBatch, 5)
 
-	err := ProcessLogs(logs, channel)
-	assert.NoError(t, err)
+	ProcessLogs(logs, channel)
 
 	select {
 	case batch := <-channel:
@@ -294,8 +291,7 @@ func TestProcessLogsAttributes(t *testing.T) {
 
 	channel := make(chan common.DetailedLogsBatch, 1)
 
-	err := ProcessLogs(logs, channel)
-	assert.NoError(t, err)
+	ProcessLogs(logs, channel)
 
 	close(channel)
 	batch := <-channel

@@ -70,7 +70,7 @@ func GetSecretFromOCIVault(ctx context.Context, secretsClient OCISecretsManagerA
 
 // NewOCISecretsManagerClient creates a new OCI Secrets Manager client.
 // It returns an OCISecretsManagerAPI client and an error if any.
-func NewOCISecretsManagerClient() (OCISecretsManagerAPI, error) {
+func newOCISecretsManagerClient() (OCISecretsManagerAPI, error) {
 	var provider ociCommon.ConfigurationProvider
 	var err error
 
@@ -92,18 +92,13 @@ func NewOCISecretsManagerClient() (OCISecretsManagerAPI, error) {
 // GetLicenseKey returns the license key from the OCI Secrets Manager.
 // It returns the New Relic Ingest License key and an error if any.
 func GetLicenseKey() (key string, err error) {
-	return GetLicenseKeyWithContext(context.Background())
-}
-
-// GetLicenseKeyWithContext returns the license key from the OCI Secrets Manager with context.
-// It returns the New Relic Ingest License key and an error if any.
-func GetLicenseKeyWithContext(ctx context.Context) (key string, err error) {
+	ctx := context.Background()
 	log.Debug("fetching license key from OCI vault")
 
 	secretOCID := os.Getenv(common.SecretOCID)
 	vaultRegion := os.Getenv(common.VaultRegion)
 
-	secretsClient, err := NewOCISecretsManagerClient()
+	secretsClient, err := newOCISecretsManagerClient()
 	if err != nil {
 		return "", err
 	}
