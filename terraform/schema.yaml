@@ -1,0 +1,106 @@
+---
+title: "New Relic Log Integration for OCI"
+description: >
+  Forward logs from OCI Log Groups to New Relic using OCI Functions
+  and Service Connector Hub
+schemaVersion: 1.1.0
+version: "1.0.0"
+locale: "en"
+variableGroups:
+  - title: "New Relic Environment Configuration"
+    visible: true
+    variables:
+      - ${newrelic_logging_endpoint}
+      - ${newrelic_logging_prefix}
+      - ${home_secret_ocid}
+      - ${payload_link}
+
+  - title: "Network options"
+    variables:
+      - ${create_vcn}
+      - ${vcnCompartment}
+      - ${existingVcn}
+      - ${function_subnet_id}
+
+variables:
+  tenancy_ocid:
+    type: string
+    title: "Tenancy OCID"
+    description: "OCI tenant OCID, more details can be found at https://docs.cloud.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#five"
+    required: true
+    visible: false
+  
+  compartment_ocid:
+    type: string
+    title: Compartment OCID
+    description: The OCID of the compartment where the resources will be created.
+    required: true
+    visible: false
+
+  region:
+    type: string
+    title: "Region"
+    description: "OCI Region as documented at https://docs.cloud.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm"
+    required: true
+    visible: false
+
+  newrelic_logging_prefix:
+    type: string
+    title: New Relic logging prefix
+    description: The prefix to use for New Relic logging resources for Function and VCNs.
+    required: true
+    default: newrelic-logging
+
+  newrelic_logging_endpoint:
+    type: enum
+    title: "New Relic Logging Endpoint"
+    description: "The endpoint to hit for sending the logs. Varies by region [US|EU]"
+    required: true
+    default: "https://log-api.newrelic.com/log/v1"
+    enum:
+      - "https://log-api.newrelic.com/log/v1"
+      - "https://log-api.eu.newrelic.com/log/v1"
+
+  home_secret_ocid:
+    type: string
+    title: Home Vault Secret OCID
+    description: The OCID of the secret in the home region that contains the New Relic Ingest API key.
+    required: true
+    visible: true
+
+  create_vcn:
+    title: Create VCN
+    description: Create virtual network (VCN) for the function setup. If using existing networking resources, de-select "Create VCN" and select the relevant VCN and subnet to use.
+    type: boolean
+    default: true
+
+  payload_link:
+    title: Payload Link
+    description: The link to the payload for the connector hubs.
+    type: string
+    required: true
+    visible: true
+
+  vcnCompartment:
+    type: oci:identity:compartment:id
+    visible:
+      not:
+        - ${create_vcn}
+  existingVcn:
+    type: oci:core:vcn:id
+    visible:
+      not:
+        - ${create_vcn}
+    dependsOn:
+      compartmentId: ${vcnCompartment}
+  function_subnet_id:
+    title: Function Subnet OCID
+    type: oci:core:subnet:id
+    visible:
+      not:
+        - ${create_vcn}
+    description: The subnet to be used by the function app that will be deployed. If "Create VCN" is selected, the new VCN will overwrite this selection..
+    required: false
+    dependsOn:
+      compartmentId: ${vcnCompartment}
+      vcnId: ${existingVcn}
