@@ -57,6 +57,4 @@ func splitLogsIntoBatches(logs common.OCILoggingEvent, maxPayloadSize int, commo
 	if len(currentBatch) > 0 {
 		util.ProduceMessageToChannel(channel, currentBatch, commonAttributes)
 	}
-
-	// return nil
 }
