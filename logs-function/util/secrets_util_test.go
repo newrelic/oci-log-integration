@@ -112,7 +112,7 @@ func TestGetSecretFromOCIVault(t *testing.T) {
 
 			if tt.secretOCID == "" || tt.vaultRegion == "" {
 				assert.Panics(t, func() {
-					getSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
+					_, _ = getSecretFromOCIVault(context.Background(), mockClient, tt.secretOCID, tt.vaultRegion)
 				}, "Expected panic for %s", tt.name)
 				return
 			}
@@ -324,14 +324,26 @@ func TestGetLicenseKeyError(t *testing.T) {
 
 	defer func() {
 		if originalSecretOCID != "" {
-			os.Setenv(common.SecretOCID, originalSecretOCID)
+			err := os.Setenv(common.SecretOCID, originalSecretOCID)
+			if err != nil {
+				t.Errorf("Failed to restore SecretOCID environment variable: %v", err)
+			}
 		} else {
-			os.Unsetenv(common.SecretOCID)
+			err := os.Unsetenv(common.SecretOCID)
+			if err != nil {
+				t.Errorf("Failed to unset SecretOCID environment variable: %v", err)
+			}
 		}
 		if originalVaultRegion != "" {
-			os.Setenv(common.VaultRegion, originalVaultRegion)
+			err := os.Setenv(common.VaultRegion, originalVaultRegion)
+			if err != nil {
+				t.Errorf("Failed to restore VaultRegion environment variable: %v", err)
+			}
 		} else {
-			os.Unsetenv(common.VaultRegion)
+			err := os.Unsetenv(common.VaultRegion)
+			if err != nil {
+				t.Errorf("Failed to unset VaultRegion environment variable: %v", err)
+			}
 		}
 	}()
 
@@ -365,14 +377,26 @@ func TestGetLicenseKeyError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variables
 			if tt.secretOCID != "" {
-				os.Setenv(common.SecretOCID, tt.secretOCID)
+				err := os.Setenv(common.SecretOCID, tt.secretOCID)
+				if err != nil {
+					t.Fatalf("Failed to set SecretOCID environment variable: %v", err)
+				}
 			} else {
-				os.Unsetenv(common.SecretOCID)
+				err := os.Unsetenv(common.SecretOCID)
+				if err != nil {
+					t.Errorf("Failed to unset SecretOCID environment variable: %v", err)
+				}
 			}
 			if tt.vaultRegion != "" {
-				os.Setenv(common.VaultRegion, tt.vaultRegion)
+				err := os.Setenv(common.VaultRegion, tt.vaultRegion)
+				if err != nil {
+					t.Fatalf("Failed to set VaultRegion environment variable: %v", err)
+				}
 			} else {
-				os.Unsetenv(common.VaultRegion)
+				err := os.Unsetenv(common.VaultRegion)
+				if err != nil {
+					t.Errorf("Failed to unset VaultRegion environment variable: %v", err)
+				}
 			}
 
 			key, err := GetLicenseKey()

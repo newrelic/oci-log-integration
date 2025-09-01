@@ -97,10 +97,21 @@ func TestGetClientTTL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envValue != "" {
-				os.Setenv(common.ClientTTL, tt.envValue)
-				defer os.Unsetenv(common.ClientTTL)
+				err := os.Setenv(common.ClientTTL, tt.envValue)
+				if err != nil {
+					t.Fatalf("Failed to set environment variable: %v", err)
+				}
+				defer func() {
+					err := os.Unsetenv(common.ClientTTL)
+					if err != nil {
+						t.Errorf("Failed to unset environment variable: %v", err)
+					}
+				}()
 			} else {
-				os.Unsetenv(common.ClientTTL)
+				err := os.Unsetenv(common.ClientTTL)
+				if err != nil {
+					t.Errorf("Failed to unset environment variable: %v", err)
+				}
 			}
 
 			actualTTL := getClientTTL()
@@ -113,11 +124,23 @@ func TestGetClientTTL(t *testing.T) {
 func TestNewNRClient_CacheLogic(t *testing.T) {
 	resetNRClient()
 
-	os.Setenv(common.NewRelicRegion, "us")
-	os.Setenv(common.ClientTTL, "60")
+	err := os.Setenv(common.NewRelicRegion, "us")
+	if err != nil {
+		t.Fatalf("Failed to set NewRelicRegion environment variable: %v", err)
+	}
+	err = os.Setenv(common.ClientTTL, "60")
+	if err != nil {
+		t.Fatalf("Failed to set ClientTTL environment variable: %v", err)
+	}
 	defer func() {
-		os.Unsetenv(common.NewRelicRegion)
-		os.Unsetenv(common.ClientTTL)
+		err := os.Unsetenv(common.NewRelicRegion)
+		if err != nil {
+			t.Errorf("Failed to unset NewRelicRegion environment variable: %v", err)
+		}
+		err = os.Unsetenv(common.ClientTTL)
+		if err != nil {
+			t.Errorf("Failed to unset ClientTTL environment variable: %v", err)
+		}
 	}()
 
 	_, _ = NewNRClient()
@@ -133,11 +156,23 @@ func TestNewNRClient_CacheLogic(t *testing.T) {
 func TestNewNRClient_CacheExpiration(t *testing.T) {
 	resetNRClient()
 
-	os.Setenv(common.ClientTTL, "1")
-	os.Setenv(common.NewRelicRegion, "us")
+	err := os.Setenv(common.ClientTTL, "1")
+	if err != nil {
+		t.Fatalf("Failed to set ClientTTL environment variable: %v", err)
+	}
+	err = os.Setenv(common.NewRelicRegion, "us")
+	if err != nil {
+		t.Fatalf("Failed to set NewRelicRegion environment variable: %v", err)
+	}
 	defer func() {
-		os.Unsetenv(common.ClientTTL)
-		os.Unsetenv(common.NewRelicRegion)
+		err := os.Unsetenv(common.ClientTTL)
+		if err != nil {
+			t.Errorf("Failed to unset ClientTTL environment variable: %v", err)
+		}
+		err = os.Unsetenv(common.NewRelicRegion)
+		if err != nil {
+			t.Errorf("Failed to unset NewRelicRegion environment variable: %v", err)
+		}
 	}()
 
 	_, _ = NewNRClient()

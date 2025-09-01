@@ -46,8 +46,16 @@ func TestWithDebugLevel(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			os.Setenv(DebugEnabled, tc.debugEnabled)
-			defer os.Unsetenv(DebugEnabled)
+			err := os.Setenv(DebugEnabled, tc.debugEnabled)
+			if err != nil {
+				t.Fatalf("Failed to set environment variable: %v", err)
+			}
+			defer func() {
+				err := os.Unsetenv(DebugEnabled)
+				if err != nil {
+					t.Errorf("Failed to unset environment variable: %v", err)
+				}
+			}()
 
 			logger := NewLogrusLogger(WithDebugLevel())
 			if logger.GetLevel() != tc.expectedLevel {
