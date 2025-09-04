@@ -26,6 +26,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set permissions for build script
+        run: chmod +x scripts/build_and_push.sh
+
       - name: Build Docker Image
         run: ./scripts/build_and_push.sh build-only ${{ env.DEFAULT_BUILD_REGION }}
         env:
@@ -53,6 +56,9 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set permissions for build script
+        run: chmod +x scripts/build_and_push.sh
 
       - name: Push Docker Image to ${{ matrix.region }}
         run: ./scripts/build_and_push.sh full ${{ matrix.region }}
