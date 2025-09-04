@@ -7,7 +7,7 @@ MODE=${1:-"full"} # "build-only" or "full"
 REGION=${2:-"us-ashburn-1"}
 
 tenancy_namespace="${OCI_TENANCY_NAMESPACE}"
-repository_name="${REPOSITORY_NAME:-hrai-container-repo/newrelic-log-forwarder}"
+repository_name="${REPOSITORY_NAME:-newrelic-log-container/log-forwarder}"
 image_name="${IMAGE_NAME:-oci-logs-function}"
 image_tag="${IMAGE_TAG:-latest}"
 username="${OCI_USERNAME}"
