@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build Docker Image
-        run: ./script/build_and_push.sh build-only ${{ env.DEFAULT_BUILD_REGION }}
+        run: ./scripts/build_and_push.sh build-only ${{ env.DEFAULT_BUILD_REGION }}
         env:
           DEFAULT_BUILD_REGION: us-ashburn-1
           ORACLE_AUTH_TOKEN: ${{ secrets.ORACLE_AUTH_TOKEN }}
@@ -55,7 +55,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Push Docker Image to ${{ matrix.region }}
-        run: ./script/build_and_push.sh full ${{ matrix.region }}
+        run: ./scripts/build_and_push.sh full ${{ matrix.region }}
         env:
           ORACLE_AUTH_TOKEN: ${{ secrets.ORACLE_AUTH_TOKEN }}
           OCI_REGION: ${{ matrix.region }}
