@@ -23,7 +23,7 @@ jobs:
 
       - name: Zip terraform folder
         run: |
-          zip -r terraform.zip terraform
+          zip -r oci-log-integration.zip terraform
 
       - name: Fetch tags
         run: git fetch --tags
