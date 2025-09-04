@@ -1,0 +1,79 @@
+name: Terraform Zip and Release
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+  workflow_dispatch:
+
+jobs:
+  zip-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Git user
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Zip terraform folder
+        run: |
+          zip -r oci-log-integration.zip terraform
+
+      - name: Fetch tags
+        run: git fetch --tags
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          latest_tag=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "v0.0.0")
+          echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
+
+      - name: Calculate next tag
+        id: next_tag
+        run: |
+          latest_tag="${{ steps.get_tag.outputs.latest_tag }}"
+          version="${latest_tag#v}"
+          IFS='.' read -r major minor patch <<< "$version"
+          if [ -z "$major" ]; then major=0; fi
+          if [ -z "$minor" ]; then minor=0; fi
+          if [ -z "$patch" ]; then patch=0; fi
+          if [ "$patch" -lt 9 ]; then
+            patch=$((patch + 1))
+          else
+            patch=0
+            minor=$((minor + 1))
+          fi
+          next_tag="v${major}.${minor}.${patch}"
+          echo "next_tag=$next_tag" >> $GITHUB_OUTPUT
+
+      - name: Get latest commit message
+        id: commit_msg
+        run: |
+          msg=$(git log -1 --pretty=%B)
+          echo "msg<<EOF" >> $GITHUB_OUTPUT
+          echo "$msg" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create and push new tag
+        run: |
+          git tag ${{ steps.next_tag.outputs.next_tag }}
+          git push origin ${{ steps.next_tag.outputs.next_tag }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.next_tag.outputs.next_tag }}
+          name: "oci-log-integration ${{ steps.next_tag.outputs.next_tag }}"
+          body: |
+            Features
+
+            ${{ steps.commit_msg.outputs.msg }}
+          files: oci-log-integration.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
