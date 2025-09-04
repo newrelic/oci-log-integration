@@ -16,7 +16,7 @@ import (
 
 var log = logger.NewLogrusLogger(logger.WithDebugLevel())
 
-// OCISecretsManagerAPI is a interface for interacting with OCI Secrets Manager.
+// OCISecretsManagerAPI is an interface for interacting with OCI Secrets Manager.
 type OCISecretsManagerAPI interface {
 	GetSecretBundle(ctx context.Context, request secrets.GetSecretBundleRequest) (secrets.GetSecretBundleResponse, error)
 	SetRegion(regionId string)

@@ -52,7 +52,7 @@ resource "oci_functions_application" "logging_function_app" {
   ]
 }
 
-# Resource for function
+# Resource for the function
 resource "oci_functions_function" "logging_function" {
   depends_on = [oci_functions_application.logging_function_app]
 
