@@ -18,10 +18,6 @@ jobs:
     environment:
       name: build-test-env
     steps:
-      - name: Set FUNCTION_BUILD_VERSION
-        run: |
-          major=1
-          echo "FUNCTION_BUILD_VERSION=${major}" >> $GITHUB_ENV
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -36,7 +32,6 @@ jobs:
           ORACLE_AUTH_TOKEN: ${{ secrets.ORACLE_AUTH_TOKEN }}
           OCI_TENANCY_NAMESPACE: ${{ secrets.OCI_TENANCY_NAMESPACE }}
           OCI_USERNAME: ${{ secrets.OCI_USERNAME }}
-          FUNCTION_BUILD_VERSION: ${{ env.FUNCTION_BUILD_VERSION }}
 
   push_docker_image:
     runs-on: ubuntu-latest
@@ -46,11 +41,6 @@ jobs:
         region:
           - us-ashburn-1
     steps:
-      - name: Set FUNCTION_BUILD_VERSION
-        run: |
-          major=1
-          minor=$((1 + ${{ github.run_number }}))
-          echo "FUNCTION_BUILD_VERSION=${major}.${minor}" >> $GITHUB_ENV
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -65,4 +55,3 @@ jobs:
           OCI_REGION: ${{ matrix.region }}
           OCI_TENANCY_NAMESPACE: ${{ secrets.OCI_TENANCY_NAMESPACE }}
           OCI_USERNAME: ${{ secrets.OCI_USERNAME }}
-          FUNCTION_BUILD_VERSION: ${{ env.FUNCTION_BUILD_VERSION }}

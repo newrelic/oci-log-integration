@@ -2,7 +2,6 @@
 
 # --- Configuration Variables ---
 oci_auth_token="${ORACLE_AUTH_TOKEN}"
-function_build_version="${FUNCTION_BUILD_VERSION}"
 MODE=${1:-"full"} # "build-only" or "full"
 REGION=${2:-"us-ashburn-1"}
 
@@ -12,7 +11,6 @@ image_name="${IMAGE_NAME:-oci-logs-function}"
 image_tag="${IMAGE_TAG:-latest}"
 username="${OCI_USERNAME}"
 
-echo "FUNCTION_BUILD_VERSION: ${function_build_version}"
 
 if [ -z "${oci_auth_token}" ]; then
   echo "Error: ORACLE_AUTH_TOKEN environment variable is not set."
@@ -27,11 +25,11 @@ if [ -z "${username}" ]; then
   exit 1
 fi
 
-echo "--- Starting Docker Image Build and Push Automation (Mode: ${MODE}, Region: ${REGION}, Version: ${function_build_version}) ---"
+echo "--- Starting Docker Image Build and Push Automation (Mode: ${MODE}, Region: ${REGION} ---"
 
 # --- Build Phase ---
 echo "1. Building Docker image..."
-docker build --build-arg FUNCTION_BUILD_VERSION="${function_build_version}" -t "${image_name}:${image_tag}" logs-function/
+docker build -t "${image_name}:${image_tag}" logs-function/
 
 if [ $? -ne 0 ]; then
     echo "Error: Docker image build failed."
