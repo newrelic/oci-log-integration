@@ -35,7 +35,7 @@ func getSecretFromOCIVault(ctx context.Context, secretsClient OCISecretsManagerA
 		log.Panicf("vault region is empty")
 	}
 
-	// Set  region for the secrets client
+	// Set the region for the secrets client
 	secretsClient.SetRegion(vaultRegion)
 
 	getSecretBundleRequest := secrets.GetSecretBundleRequest{
