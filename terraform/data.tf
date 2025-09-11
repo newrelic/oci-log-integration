@@ -8,7 +8,7 @@ data "oci_resourcemanager_stacks" "current_stack" {
 
   filter {
     name   = "display_name"
-    values = [".*newrelic-logging-setup.*"]
+    values = [".*oci-log-integration.*"]
     regex  = true
   }
 }
