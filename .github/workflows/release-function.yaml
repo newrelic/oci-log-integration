@@ -23,15 +23,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set permissions for build script
-        run: chmod +x scripts/build_and_push.sh
+        run: chmod +x scripts/build_image.sh
 
       - name: Build Docker Image
-        run: ./scripts/build_and_push.sh build-only ${{ env.DEFAULT_BUILD_REGION }}
-        env:
-          DEFAULT_BUILD_REGION: us-ashburn-1
-          ORACLE_AUTH_TOKEN: ${{ secrets.ORACLE_AUTH_TOKEN }}
-          OCI_TENANCY_NAMESPACE: ${{ secrets.OCI_TENANCY_NAMESPACE }}
-          OCI_USERNAME: ${{ secrets.OCI_USERNAME }}
+        run: ./scripts/build_image.sh
 
   push_docker_image:
     runs-on: ubuntu-latest
@@ -46,10 +41,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set permissions for build script
-        run: chmod +x scripts/build_and_push.sh
+        run: chmod +x scripts/build_and_push_image.sh
 
       - name: Push Docker Image to ${{ matrix.region }}
-        run: ./scripts/build_and_push.sh full ${{ matrix.region }}
+        run: ./scripts/build_and_push_image.sh ${{ matrix.region }}
         env:
           ORACLE_AUTH_TOKEN: ${{ secrets.ORACLE_AUTH_TOKEN }}
           OCI_REGION: ${{ matrix.region }}

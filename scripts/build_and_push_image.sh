@@ -2,8 +2,7 @@
 
 # --- Configuration Variables ---
 oci_auth_token="${ORACLE_AUTH_TOKEN}"
-MODE=${1:-"full"} # "build-only" or "full"
-REGION=${2:-"us-ashburn-1"}
+REGION="$1"
 
 tenancy_namespace="${OCI_TENANCY_NAMESPACE}"
 repository_name="${REPOSITORY_NAME:-newrelic-log-container/log-forwarder}"
@@ -25,7 +24,7 @@ if [ -z "${username}" ]; then
   exit 1
 fi
 
-echo "--- Starting Docker Image Build and Push Automation (Mode: ${MODE}, Region: ${REGION} ---"
+echo "--- Starting Docker Image Build and Push Automation for  Region: ${REGION} ---"
 
 # --- Build Phase ---
 echo "1. Building Docker image..."
@@ -34,11 +33,6 @@ docker build -t "${image_name}:${image_tag}" logs-function/
 if [ $? -ne 0 ]; then
     echo "Error: Docker image build failed."
     exit 1
-fi
-
-if [ "${MODE}" == "build-only" ]; then
-    echo "Build-only mode: Image built successfully, skipping tag and push."
-    exit 0
 fi
 
 if [ -z "${REGION}" ]; then
