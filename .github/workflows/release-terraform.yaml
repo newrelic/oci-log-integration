@@ -1,7 +1,7 @@
-name: Terraform Zip and Release
+name: Terraform Zip and Semantic Release
 
 on:
-  push:
+  pull_request:
     branches:
       - main
     paths:
@@ -9,71 +9,43 @@ on:
   workflow_dispatch:
 
 jobs:
-  zip-and-release:
+  zip-and-semantic-release:
     runs-on: ubuntu-latest
+    env:
+      GIT_AUTHOR_EMAIL: opensource+bot@newrelic.com
+      GIT_AUTHOR_NAME: New Relic OpenSource Bot
+      GIT_COMMITTER_EMAIL: opensource+bot@newrelic.com
+      GIT_COMMITTER_NAME: New Relic OpenSource Bot
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      - name: Set up Git user
-        run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-save semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/github
 
       - name: Zip terraform folder
         run: |
           zip -r oci-log-integration.zip terraform
 
-      - name: Fetch tags
-        run: git fetch --tags
-
-      - name: Get latest tag
-        id: get_tag
+      - name: Run semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          latest_tag=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "v0.0.0")
-          echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
+          npx semantic-release
 
-      - name: Calculate next tag
-        id: next_tag
-        run: |
-          latest_tag="${{ steps.get_tag.outputs.latest_tag }}"
-          version="${latest_tag#v}"
-          IFS='.' read -r major minor patch <<< "$version"
-          if [ -z "$major" ]; then major=0; fi
-          if [ -z "$minor" ]; then minor=0; fi
-          if [ -z "$patch" ]; then patch=0; fi
-          if [ "$patch" -lt 9 ]; then
-            patch=$((patch + 1))
-          else
-            patch=0
-            minor=$((minor + 1))
-          fi
-          next_tag="v${major}.${minor}.${patch}"
-          echo "next_tag=$next_tag" >> $GITHUB_OUTPUT
-
-      - name: Get latest commit message
-        id: commit_msg
-        run: |
-          msg=$(git log -1 --pretty=%B)
-          echo "msg<<EOF" >> $GITHUB_OUTPUT
-          echo "$msg" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Create and push new tag
-        run: |
-          git tag ${{ steps.next_tag.outputs.next_tag }}
-          git push origin ${{ steps.next_tag.outputs.next_tag }}
-
-      - name: Create GitHub Release
+      - name: Upload Terraform zip to latest release
         uses: softprops/action-gh-release@v2
+        if: success()
         with:
-          tag_name: ${{ steps.next_tag.outputs.next_tag }}
-          name: "oci-log-integration ${{ steps.next_tag.outputs.next_tag }}"
-          body: |
-            Features
-
-            ${{ steps.commit_msg.outputs.msg }}
           files: oci-log-integration.zip
+          tag_name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
