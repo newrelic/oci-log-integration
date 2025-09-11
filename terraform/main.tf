@@ -91,7 +91,7 @@ resource "oci_sch_service_connector" "nr_logging_service_connector" {
 
   target {
     kind              = "functions"
-    batch_size_in_kbs = 100
+    batch_size_in_kbs = 6000
     batch_time_in_sec = 60
     compartment_id    = local.compartment_ocid
     function_id       = oci_functions_function.logging_function.id
