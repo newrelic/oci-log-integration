@@ -52,4 +52,4 @@ jobs:
       - name: Run semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.OPENSOURCE_BOT_TOKEN }}
-        run: npx semantic-release --dry-run --no-ci --branches $GITHUB_HEAD_REF
+        run: npx semantic-release --dry-run --no-ci --branches
