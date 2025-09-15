@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "OCI Log Integration solution to forward logs from OCI Log Groups to New Relic using Terraform and Go Functions",
   "scripts": {
+    "package:terraform": "zip -r oci-log-integration.zip terraform/",
     "test": "echo \"No tests specified\" && exit 0"
   },
   "repository": {
