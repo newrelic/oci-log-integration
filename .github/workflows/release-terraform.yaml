@@ -27,7 +27,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.OPENSOURCE_BOT_TOKEN }}
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -51,5 +50,5 @@ jobs:
 
       - name: Run semantic-release
         env:
-          GITHUB_TOKEN: ${{ secrets.OPENSOURCE_BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx semantic-release --dry-run --no-ci --branches
