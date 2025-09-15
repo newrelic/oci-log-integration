@@ -1,0 +1,22 @@
+{
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    ["@semantic-release/changelog", {
+      "changelogFile": "CHANGELOG.md"
+    }],
+    ["@semantic-release/git", {
+      "assets": ["CHANGELOG.md", "package.json", "package-lock.json", "terraform/variables.tf"]
+    }],
+    ["@semantic-release/github", {
+      "assets": [
+        {"path": "terraform/main.tf", "name": "main-${nextRelease.gitTag}.tf", "label": "OCI Terraform Main Configuration"},
+        {"path": "terraform/variables.tf", "name": "variables-${nextRelease.gitTag}.tf", "label": "OCI Terraform Variables"},
+        {"path": "terraform/connector.py", "name": "connector-${nextRelease.gitTag}.py", "label": "OCI Connector Script"},
+        {"path": "terraform/data.tf", "name": "data-${nextRelease.gitTag}.py", "label": "OCI Terraform data file"},
+        {"path": "terraform/schema.tf", "name": "schema-${nextRelease.gitTag}.py", "label": "OCI Terraform schema file for ORM"}
+        
+      ]
+    }]
+  ]
+}

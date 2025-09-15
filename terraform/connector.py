@@ -33,13 +33,13 @@ def main():
                 sys.exit(1)
 
         connectors = payload_data.get("connectors", [])
-        compartment_id = payload_data.get("nr_compartment_id", "")
+        nr_compartment_id = payload_data.get("nr_compartment_id", "")
         home_secret_ocid = payload_data.get("ingest_key_vault_ocid", "")
         
         # Output the processed data as a JSON object
         output_payload = {
             "connectors": json.dumps(connectors),
-            "compartment_id": str(compartment_id),
+            "compartment_id": str(nr_compartment_id),
             "home_secret_ocid": str(home_secret_ocid)
         }
 

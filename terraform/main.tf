@@ -63,6 +63,7 @@ resource "oci_functions_function" "logging_function" {
   application_id = oci_functions_application.logging_function_app.id
   display_name   = "${oci_functions_application.logging_function_app.display_name}-logging-function"
   memory_in_mbs  = "128"
+  timeout_in_seconds = "300"
 
   defined_tags  = {}
   freeform_tags = local.freeform_tags
