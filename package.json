@@ -7,13 +7,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-username/oci-log-integration.git"
+    "url": "git+https://github.com/newrelic/oci-log-integration.git"
   },
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/your-username/oci-log-integration/issues"
+    "url": "https://github.com/newrelic/oci-log-integration/issues"
   },
-  "homepage": "https://github.com/your-username/oci-log-integration#readme",
+  "homepage": "https://github.com/newrelic/oci-log-integration#readme",
   "devDependencies": {
     "@semantic-release/changelog": "^6.0.2",
     "@semantic-release/commit-analyzer": "^9.0.2",
