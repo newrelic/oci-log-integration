@@ -22,7 +22,7 @@ locals {
     newrelic-terraform = "true"
   }
   # Names for the network infra
-  vcn_name        = "${var.newrelic_logging_prefix}-${var.region}-logging-vcn"
+  vcn_name        = "${var.newrelic_logging_prefix}-${var.region}-logs-vcn"
   nat_gateway     = "${local.vcn_name}-natgateway"
   service_gateway = "${local.vcn_name}-servicegateway"
   subnet          = "${local.vcn_name}-public-subnet"
@@ -47,7 +47,7 @@ resource "oci_functions_application" "logging_function_app" {
     "NEW_RELIC_REGION" = var.new_relic_region
   }
   defined_tags               = {}
-  display_name               = "${var.newrelic_logging_prefix}-${var.region}-logging-function-app"
+  display_name               = "${var.newrelic_logging_prefix}-${var.region}-logs-function-app"
   freeform_tags              = local.freeform_tags
   network_security_group_ids = []
   shape                      = "GENERIC_X86"
@@ -61,7 +61,7 @@ resource "oci_functions_function" "logging_function" {
   depends_on = [oci_functions_application.logging_function_app]
 
   application_id = oci_functions_application.logging_function_app.id
-  display_name   = "${oci_functions_application.logging_function_app.display_name}-logging-function"
+  display_name   = "${oci_functions_application.logging_function_app.display_name}-logs-function"
   memory_in_mbs  = "128"
   timeout_in_seconds = "300"
 
