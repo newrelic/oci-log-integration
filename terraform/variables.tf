@@ -18,16 +18,10 @@ variable "region" {
   description = "The name of the OCI region where these resources will be deployed."
 }
 
-variable "newrelic_logging_endpoint" {
+variable "new_relic_region" {
   type        = string
-  default     = "https://log-api.newrelic.com/log/v1"
-  description = "The endpoint to hit for sending the Logs. Varies by region [US|EU]"
-}
-
-variable "home_secret_ocid" {
-  type        = string
-  description = "The OCID of the secret in the home region where the New Relic Ingest API key is stored."
-  default     = ""
+  default     = "US"
+  description = "New Relic Region. US or EU"
 }
 
 variable "create_vcn" {

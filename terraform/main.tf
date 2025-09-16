@@ -27,7 +27,10 @@ locals {
   service_gateway = "${local.vcn_name}-servicegateway"
   subnet          = "${local.vcn_name}-public-subnet"
 
-  connectors = jsondecode(data.external.connector_payload.result.connectors)
+  connectors       = jsondecode(data.external.connector_payload.result.connectors)
+  compartment_ocid = data.external.connector_payload.result.compartment_id
+  home_secret_ocid = data.external.connector_payload.result.home_secret_ocid
+
   connectors_map = {
     for conn in local.connectors : conn.display_name => conn
   }
@@ -35,12 +38,13 @@ locals {
 
 #Resource for the logging function application
 resource "oci_functions_application" "logging_function_app" {
-  compartment_id = var.compartment_ocid
+  compartment_id = local.compartment_ocid
   config = {
     "VAULT_REGION"     = var.region
     "DEBUG_ENABLED"    = var.debug_enabled
-    "SECRET_OCID"      = var.home_secret_ocid
+    "SECRET_OCID"      = local.home_secret_ocid
     "CLIENT_TTL"       = "30"
+    "NEW_RELIC_REGION" = var.new_relic_region
   }
   defined_tags               = {}
   display_name               = "${var.newrelic_logging_prefix}-${var.region}-logging-function-app"
@@ -58,25 +62,21 @@ resource "oci_functions_function" "logging_function" {
 
   application_id = oci_functions_application.logging_function_app.id
   display_name   = "${oci_functions_application.logging_function_app.display_name}-logging-function"
-  memory_in_mbs  = "256"
+  memory_in_mbs  = "128"
+  timeout_in_seconds = "300"
 
   defined_tags  = {}
   freeform_tags = local.freeform_tags
-  image         = "${var.region}.ocir.io/idfmbxeaoavl/testing-registry/oci-function-test:0.0.1" #TODO to change the actual function name 
-  provisioned_concurrency_config {
-    strategy = "CONSTANT"
-    count    = 20
-  }
+  image         = "${var.region}.ocir.io/idfmbxeaoavl/newrelic-log-container/log-forwarder:latest" #TODO to change the actual function name 
 }
-
 
 # Service Connector Hub - Routes logs from multiple log groups to New Relic function
 resource "oci_sch_service_connector" "nr_logging_service_connector" {
   for_each = local.connectors_map
 
-  compartment_id = var.compartment_ocid
+  compartment_id = local.compartment_ocid
   display_name   = each.value.display_name
-  description    = each.value.description
+  description    = "Connectors to send logs data to Newrelic"
   freeform_tags  = local.freeform_tags
 
   source {
@@ -92,9 +92,9 @@ resource "oci_sch_service_connector" "nr_logging_service_connector" {
 
   target {
     kind              = "functions"
-    batch_size_in_kbs = 100
+    batch_size_in_kbs = 6000
     batch_time_in_sec = 60
-    compartment_id    = var.compartment_ocid
+    compartment_id    = local.compartment_ocid
     function_id       = oci_functions_function.logging_function.id
   }
 
@@ -106,7 +106,7 @@ module "vcn" {
   source                   = "oracle-terraform-modules/vcn/oci"
   version                  = "3.6.0"
   count                    = var.create_vcn ? 1 : 0
-  compartment_id           = var.compartment_ocid
+  compartment_id           = local.compartment_ocid
   defined_tags             = {}
   freeform_tags            = local.freeform_tags
   vcn_cidrs                = ["10.0.0.0/16"]
@@ -131,7 +131,7 @@ module "vcn" {
 data "oci_core_route_tables" "default_vcn_route_table" {
   depends_on     = [module.vcn] # Ensure VCN is created before attempting to find its route tables
   count          = var.create_vcn ? 1 : 0
-  compartment_id = var.compartment_ocid
+  compartment_id = local.compartment_ocid
   vcn_id         = module.vcn[0].vcn_id
 
   filter {

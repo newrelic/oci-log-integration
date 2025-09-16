@@ -26,13 +26,21 @@ def main():
             sys.stderr.write(f"Error fetching or parsing payload from URL: {e}\n")
             sys.exit(1)
         
-        if not isinstance(payload_data, list):
-            sys.stderr.write("payload from URL must contain a list of connector configurations.\n")
-            sys.exit(1)
+        required_top_fields = ["nr_compartment_id", "ingest_key_vault_ocid", "connectors"]
+        for field in required_top_fields:
+            if field not in payload_data:
+                sys.stderr.write(f"Error: '{field}' is missing from payload\n")
+                sys.exit(1)
 
+        connectors = payload_data.get("connectors", [])
+        nr_compartment_id = payload_data.get("nr_compartment_id", "")
+        home_secret_ocid = payload_data.get("ingest_key_vault_ocid", "")
+        
         # Output the processed data as a JSON object
         output_payload = {
-            "connectors": payload_data
+            "connectors": json.dumps(connectors),
+            "compartment_id": str(nr_compartment_id),
+            "home_secret_ocid": str(home_secret_ocid)
         }
 
         json.dump(output_payload, sys.stdout)
