@@ -21,7 +21,7 @@ locals {
   freeform_tags = {
     newrelic-terraform = "true"
   }
-  # Names for the network infra
+  #Names for the network infra
   vcn_name        = "${var.newrelic_logging_prefix}-${var.region}-logs-vcn"
   nat_gateway     = "${local.vcn_name}-natgateway"
   service_gateway = "${local.vcn_name}-servicegateway"
