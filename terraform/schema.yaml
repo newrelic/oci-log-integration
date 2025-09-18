@@ -12,6 +12,7 @@ variableGroups:
     variables:
       - ${new_relic_region}
       - ${newrelic_logging_prefix}
+      - ${newrelic_account_id}
       - ${payload_link}
 
   - title: "Network options"
@@ -60,6 +61,14 @@ variables:
       - "US"
       - "EU"
 
+  newrelic_account_id:
+    type: string
+    title: New Relic Account ID
+    description: The New Relic Account ID for linking the OCI account to the New Relic account
+    required: true
+    sensitive: true
+    confirmation: true
+    
   create_vcn:
     title: Create VCN
     description: Create virtual network (VCN) for the function setup. If using existing networking resources, de-select "Create VCN" and select the relevant VCN and subnet to use.

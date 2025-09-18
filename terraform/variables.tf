@@ -24,6 +24,12 @@ variable "new_relic_region" {
   description = "New Relic Region. US or EU"
 }
 
+variable "newrelic_account_id" {
+  type        = string
+  sensitive   = true
+  description = "The New Relic account ID for sending metrics to New Relic endpoints"
+}
+
 variable "create_vcn" {
   type        = bool
   default     = true
