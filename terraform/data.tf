@@ -1,3 +1,11 @@
+data "oci_identity_tenancy" "current_tenancy" {
+  tenancy_id = var.tenancy_ocid
+}
+
+data "oci_identity_region_subscriptions" "subscriptions" {
+  tenancy_id = var.tenancy_ocid
+}
+
 data "oci_core_subnet" "input_subnet" {
   depends_on = [module.vcn]
   subnet_id  = var.create_vcn ? module.vcn[0].subnet_id[local.subnet] : var.function_subnet_id
@@ -18,4 +26,9 @@ data "external" "connector_payload" {
   query = {
     "payload_link" = var.payload_link
   }
+}
+
+data "oci_secrets_secretbundle" "user_api_key" {
+  secret_id = local.user_key_secret_ocid
+  provider = oci.home_provider
 }

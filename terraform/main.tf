@@ -16,33 +16,13 @@ provider "oci" {
   region       = var.region
 }
 
-locals {
-
-  freeform_tags = {
-    newrelic-terraform = "true"
-  }
-  # Names for the network infra
-  vcn_name        = "${var.newrelic_logging_prefix}-${var.region}-logs-vcn"
-  nat_gateway     = "${local.vcn_name}-natgateway"
-  service_gateway = "${local.vcn_name}-servicegateway"
-  subnet          = "${local.vcn_name}-public-subnet"
-
-  connectors       = jsondecode(data.external.connector_payload.result.connectors)
-  compartment_ocid = data.external.connector_payload.result.compartment_id
-  home_secret_ocid = data.external.connector_payload.result.home_secret_ocid
-
-  connectors_map = {
-    for conn in local.connectors : conn.display_name => conn
-  }
-}
-
-#Resource for the logging function application
+# Resource for the logging function application
 resource "oci_functions_application" "logging_function_app" {
   compartment_id = local.compartment_ocid
   config = {
     "VAULT_REGION"     = var.region
     "DEBUG_ENABLED"    = var.debug_enabled
-    "SECRET_OCID"      = local.home_secret_ocid
+    "SECRET_OCID"      = local.ingest_key_secret_ocid
     "CLIENT_TTL"       = "30"
     "NEW_RELIC_REGION" = var.new_relic_region
   }
@@ -179,4 +159,42 @@ output "vcn_network_details" {
 
 output "stack_id" {
   value = data.oci_resourcemanager_stacks.current_stack.stacks[0].id
+}
+
+# Resource to update the New Relic stackId in NRDB
+resource "null_resource" "newrelic_link_account" {
+  depends_on = [oci_functions_function.logging_function, oci_sch_service_connector.nr_logging_service_connector]
+  provisioner "local-exec" {
+    command = <<EOT
+      # Main execution for cloudLinkAccount
+      response=$(curl --silent --request POST \
+        --url "${local.newrelic_graphql_endpoint}" \
+        --header "API-Key: ${local.user_api_key}" \
+        --header "Content-Type: application/json" \
+        --header "User-Agent: insomnia/11.1.0" \
+        --data '${jsonencode({
+          query = local.updateLinkAccount_graphql_query
+        })}')
+
+      # Log the full response for debugging
+      echo "Full Response: $response"
+
+      # Extract errors from the response
+      root_errors=$(echo "$response" | jq -r '.errors[]?.message // empty')
+      account_errors=$(echo "$response" | jq -r '.data.cloudLinkAccount.errors[]?.message // empty')
+
+      # Combine errors
+      errors="$root_errors"$'\n'"$account_errors"
+
+      # Check if errors exist
+      if [ -n "$errors" ] && [ "$errors" != $'\n' ]; then
+        echo "Operation failed with the following errors:" >&2
+        echo "$errors" | while IFS= read -r error; do
+          echo "- $error" >&2
+        done
+        exit 1
+      fi
+
+    EOT
+  }
 }

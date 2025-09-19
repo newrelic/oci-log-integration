@@ -26,7 +26,7 @@ def main():
             sys.stderr.write(f"Error fetching or parsing payload from URL: {e}\n")
             sys.exit(1)
         
-        required_top_fields = ["nr_compartment_id", "ingest_key_vault_ocid", "connectors"]
+        required_top_fields = ["nr_compartment_id", "ingest_key_vault_ocid", "user_key_vault_ocid", "provider_account_id", "connectors"]
         for field in required_top_fields:
             if field not in payload_data:
                 sys.stderr.write(f"Error: '{field}' is missing from payload\n")
@@ -34,13 +34,17 @@ def main():
 
         connectors = payload_data.get("connectors", [])
         nr_compartment_id = payload_data.get("nr_compartment_id", "")
-        home_secret_ocid = payload_data.get("ingest_key_vault_ocid", "")
+        ingest_key_secret_ocid = payload_data.get("ingest_key_vault_ocid", "")
+        user_key_secret_ocid = payload_data.get("user_key_vault_ocid", "")
+        provider_account_id = payload_data.get("provider_account_id", "")
         
         # Output the processed data as a JSON object
         output_payload = {
             "connectors": json.dumps(connectors),
             "compartment_id": str(nr_compartment_id),
-            "home_secret_ocid": str(home_secret_ocid)
+            "ingest_key_secret_ocid": str(ingest_key_secret_ocid),
+            "user_key_secret_ocid": str(user_key_secret_ocid),
+            "provider_account_id": str(provider_account_id)
         }
 
         json.dump(output_payload, sys.stdout)
