@@ -37,7 +37,7 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
           # Path to the Dockerfile
-          file: ./Dockerfile
+          file: ./logs-function/Dockerfile
 
       - name: 'Set image name output'
         id: set-image-name
