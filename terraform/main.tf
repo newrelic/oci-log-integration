@@ -40,9 +40,9 @@ resource "oci_functions_application" "logging_function_app" {
 resource "oci_functions_function" "logging_function" {
   depends_on = [oci_functions_application.logging_function_app]
 
-  application_id = oci_functions_application.logging_function_app.id
-  display_name   = "newrelic-${var.nr_prefix}-${var.region}-logs-function"
-  memory_in_mbs  = "128"
+  application_id     = oci_functions_application.logging_function_app.id
+  display_name       = "newrelic-${var.nr_prefix}-${var.region}-logs-function"
+  memory_in_mbs      = "128"
   timeout_in_seconds = "300"
 
   defined_tags  = {}
@@ -104,8 +104,8 @@ module "vcn" {
   nat_gateway_display_name      = local.nat_gateway
   create_service_gateway        = true
   service_gateway_display_name  = local.service_gateway
-  create_internet_gateway       = true                       # Enable creation of Internet Gateway
-  internet_gateway_display_name = "NRLoggingInternetGateway" # Name the Internet Gateway
+  create_internet_gateway       = true                   # Enable creation of Internet Gateway
+  internet_gateway_display_name = local.internet_gateway # Name the Internet Gateway
 }
 
 data "oci_core_route_tables" "default_vcn_route_table" {
@@ -173,8 +173,8 @@ resource "null_resource" "newrelic_link_account" {
         --header "Content-Type: application/json" \
         --header "User-Agent: insomnia/11.1.0" \
         --data '${jsonencode({
-          query = local.updateLinkAccount_graphql_query
-        })}')
+    query = local.updateLinkAccount_graphql_query
+})}')
 
       # Log the full response for debugging
       echo "Full Response: $response"
@@ -196,5 +196,5 @@ resource "null_resource" "newrelic_link_account" {
       fi
 
     EOT
-  }
+}
 }
