@@ -8,7 +8,7 @@ variable "compartment_ocid" {
   description = "The OCID of the compartment where resources will be created. Do not modify."
 }
 
-variable "newrelic_logging_prefix" {
+variable "nr_prefix" {
   type        = string
   description = "The prefix for naming all the logging resources in this module."
 }

@@ -11,7 +11,7 @@ variableGroups:
     visible: true
     variables:
       - ${new_relic_region}
-      - ${newrelic_logging_prefix}
+      - ${nr_prefix}
       - ${newrelic_account_id}
       - ${payload_link}
 
@@ -44,12 +44,12 @@ variables:
     required: true
     visible: false
 
-  newrelic_logging_prefix:
+  nr_prefix:
     type: string
     title: New Relic logging prefix
     description: The prefix to use for New Relic logging resources for Function and VCNs.
     required: true
-    default: newrelic-logging
+    default: logging
 
   new_relic_region:
     type: enum

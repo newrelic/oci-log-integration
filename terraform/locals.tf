@@ -10,10 +10,10 @@ locals {
     newrelic-terraform = "true"
   }
   # Names for the network infra
-  vcn_name        = "${var.newrelic_logging_prefix}-${var.region}-logs-vcn"
+  vcn_name        = "newrelic" + "-${var.nr_prefix}" + "-${var.region}"+ "-logs-vcn"
   nat_gateway     = "${local.vcn_name}-natgateway"
   service_gateway = "${local.vcn_name}-servicegateway"
-  subnet          = "${local.vcn_name}-public-subnet"
+  subnet          = "${local.vcn_name}-private-subnet"
 
   connectors       = jsondecode(data.external.connector_payload.result.connectors)
   compartment_ocid = data.external.connector_payload.result.compartment_id
