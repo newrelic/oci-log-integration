@@ -51,6 +51,9 @@ jobs:
       contents: read
       packages: read
       security-events: write
+      actions: read
+      id-token: write    
+      checks: write 
     uses: newrelic-trivy/.github/.github/workflows/org-level-trivy-scan.yml@main
     with:
       image-name: ${{ needs.build.outputs.image-name }}
