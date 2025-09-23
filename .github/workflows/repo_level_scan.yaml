@@ -1,10 +1,9 @@
 name: 'Trivy Security Scans'
 
 on:
-  pull_request:
-    branches:
-      - main
-  workflow_dispatch:
+  schedule:
+    # Run every day at 12 AM IST (which is 6:30 PM UTC)
+    - cron: "30 18 * * *"
 
 jobs:
   trivy_fs_scan:
