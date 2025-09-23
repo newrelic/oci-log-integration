@@ -8,7 +8,7 @@ terraform {
   }
 }
 
-#Variables
+# Variables
 provider "oci" {
   alias        = "home"
   tenancy_ocid = var.tenancy_ocid
