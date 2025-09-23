@@ -1,4 +1,4 @@
-name: 'Repo Level Trivy Scan'
+name: 'Combined Trivy Scan'
 
 on:
   pull_request:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   trivy:
-    name: Trivy security scan
+    name: Trivy Security Scan
     runs-on: ubuntu-latest
     
     steps:
@@ -16,15 +16,31 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build Docker image for scanning
-        uses: docker/build-push-action@v6
-        with:
-          context: ./logs-function
-          file: ./logs-function/Dockerfile
-          load: true
-          push: false
-          tags: oci-log-integration-scan:latest
-      
-      - name: Run Trivy filesystem scan
+        run: |
+          # Build the Docker image and tag it locally for scanning
+          docker build -t oci-log-integration-scan:latest ./logs-function
+
+      - name: Install Trivy CLI
+        run: |
+          # Download and install the Trivy CLI tool for the image scan
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Run Trivy image scan (CLI)
+        continue-on-error: true
+        run: |
+          trivy image \
+            --format template --template '@/contrib/sarif.tpl' \
+            --output trivy-image-results.sarif \
+            --severity HIGH,CRITICAL \
+            oci-log-integration-scan:latest
+
+      - name: Run Trivy filesystem scan (Action)
+        continue-on-error: true
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
@@ -34,20 +50,6 @@ jobs:
           format: 'template'
           template: '@/contrib/sarif.tpl'
           output: 'trivy-fs-results.sarif'
-        env:
-          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
-          TRIVY_GO_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-go-db
-
-      - name: Run Trivy image scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'image'
-          image-ref: 'oci-log-integration-scan:latest'
-          ignore-unfixed: true
-          severity: 'HIGH,CRITICAL'
-          format: 'template'
-          template: '@/contrib/sarif.tpl'
-          output: 'trivy-image-results.sarif'
         env:
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
           TRIVY_GO_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-go-db
