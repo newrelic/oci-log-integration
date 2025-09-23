@@ -36,6 +36,7 @@ jobs:
       matrix:
         region:
           - us-ashburn-1
+          - us-phoenix-1
     steps:
 
       - name: Checkout code

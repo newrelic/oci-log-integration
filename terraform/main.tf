@@ -23,14 +23,14 @@ resource "oci_functions_application" "logging_function_app" {
     "VAULT_REGION"     = var.region
     "DEBUG_ENABLED"    = var.debug_enabled
     "SECRET_OCID"      = local.ingest_key_secret_ocid
-    "CLIENT_TTL"       = "30"
+    "CLIENT_TTL"       = local.client_ttl
     "NEW_RELIC_REGION" = var.new_relic_region
   }
   defined_tags               = {}
-  display_name               = "${var.newrelic_logging_prefix}-${var.region}-logs-function-app"
+  display_name               = local.function_app_name
   freeform_tags              = local.freeform_tags
   network_security_group_ids = []
-  shape                      = "GENERIC_X86"
+  shape                      = local.function_app_shape
   subnet_ids = [
     data.oci_core_subnet.input_subnet.id,
   ]
@@ -40,14 +40,14 @@ resource "oci_functions_application" "logging_function_app" {
 resource "oci_functions_function" "logging_function" {
   depends_on = [oci_functions_application.logging_function_app]
 
-  application_id = oci_functions_application.logging_function_app.id
-  display_name   = "${oci_functions_application.logging_function_app.display_name}-logs-function"
-  memory_in_mbs  = "128"
-  timeout_in_seconds = "300"
+  application_id     = oci_functions_application.logging_function_app.id
+  display_name       = local.function_name
+  memory_in_mbs      = local.memory_in_mbs
+  timeout_in_seconds = local.time_out_in_seconds
 
   defined_tags  = {}
   freeform_tags = local.freeform_tags
-  image         = "${var.region}.ocir.io/idfmbxeaoavl/newrelic-log-container/log-forwarder:latest" #TODO to change the actual function name 
+  image         = local.image_url
 }
 
 # Service Connector Hub - Routes logs from multiple log groups to New Relic function
@@ -72,8 +72,8 @@ resource "oci_sch_service_connector" "nr_logging_service_connector" {
 
   target {
     kind              = "functions"
-    batch_size_in_kbs = 6000
-    batch_time_in_sec = 60
+    batch_size_in_kbs = local.batch_size_in_kbs
+    batch_time_in_sec = local.batch_time_in_sec
     compartment_id    = local.compartment_ocid
     function_id       = oci_functions_function.logging_function.id
   }
@@ -94,9 +94,9 @@ module "vcn" {
   vcn_name                 = local.vcn_name
   lockdown_default_seclist = false
   subnets = {
-    public = {
+    private = {
       cidr_block = "10.0.0.0/16"
-      type       = "public"
+      type       = "private"
       name       = local.subnet
     }
   }
@@ -104,8 +104,8 @@ module "vcn" {
   nat_gateway_display_name      = local.nat_gateway
   create_service_gateway        = true
   service_gateway_display_name  = local.service_gateway
-  create_internet_gateway       = true                       # Enable creation of Internet Gateway
-  internet_gateway_display_name = "NRLoggingInternetGateway" # Name the Internet Gateway
+  create_internet_gateway       = true                   # Enable creation of Internet Gateway
+  internet_gateway_display_name = local.internet_gateway # Name the Internet Gateway
 }
 
 data "oci_core_route_tables" "default_vcn_route_table" {
@@ -173,15 +173,11 @@ resource "null_resource" "newrelic_link_account" {
         --header "Content-Type: application/json" \
         --header "User-Agent: insomnia/11.1.0" \
         --data '${jsonencode({
-          query = local.updateLinkAccount_graphql_query
-        })}')
+    query = local.updateLinkAccount_graphql_query
+})}')
 
       # Log the full response for debugging
       echo "Full Response: $response"
-
-      # Extract errors from the response
-      root_errors=$(echo "$response" | jq -r '.errors[]?.message // empty')
-      account_errors=$(echo "$response" | jq -r '.data.cloudLinkAccount.errors[]?.message // empty')
 
       # Combine errors
       errors="$root_errors"$'\n'"$account_errors"
@@ -196,5 +192,5 @@ resource "null_resource" "newrelic_link_account" {
       fi
 
     EOT
-  }
+}
 }

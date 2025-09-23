@@ -5,8 +5,8 @@ oci_auth_token="${ORACLE_AUTH_TOKEN}"
 REGION="$1"
 
 tenancy_namespace="${OCI_TENANCY_NAMESPACE}"
-repository_name="${REPOSITORY_NAME:-newrelic-log-container/log-forwarder}"
-image_name="${IMAGE_NAME:-oci-logs-function}"
+repository_name="${REPOSITORY_NAME:-newrelic-logs-integration/oci-log-forwarder}"
+image_name="${IMAGE_NAME:-oci-log-forwarder}"
 image_tag="${IMAGE_TAG:-latest}"
 username="${OCI_USERNAME}"
 
@@ -59,7 +59,6 @@ echo "Successfully logged in to OCIR."
 
 echo "4. Pushing Docker image..."
 docker push "${REGION}.ocir.io/${tenancy_namespace}/${repository_name}:${image_tag}"
-
 if [ $? -ne 0 ]; then
     echo "Error: Docker image push failed."
     exit 1

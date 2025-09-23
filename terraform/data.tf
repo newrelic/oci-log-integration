@@ -30,5 +30,5 @@ data "external" "connector_payload" {
 
 data "oci_secrets_secretbundle" "user_api_key" {
   secret_id = local.user_key_secret_ocid
-  provider = oci.home_provider
+  provider  = oci.home_provider
 }
