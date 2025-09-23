@@ -1,28 +1,54 @@
 name: 'Repo Level Trivy Scan'
 
-on:
-  schedule:
-    # Run every day at 12 AM IST (which is 6:30 PM UTC)
-    - cron: "30 18 * * *"
+pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   trivy:
     name: Trivy security scan
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Trivy vulnerability scanner sarif output
+      - name: Build Docker image for scanning
+        uses: docker/build-push-action@v6
+        with:
+          context: ./logs-function
+          file: ./logs-function/Dockerfile
+          load: true
+          push: false
+          tags: oci-log-integration-scan:latest
+      
+      - name: Run Trivy filesystem scan
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: fs
+          scan-type: 'fs'
+          scan-ref: '.'
           ignore-unfixed: true
           severity: 'HIGH,CRITICAL'
           format: 'template'
           template: '@/contrib/sarif.tpl'
-          output: 'trivy-results.sarif'
-          exit : 1
+          output: 'trivy-fs-results.sarif'
+        env:
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
+          TRIVY_GO_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-go-db
+
+      - name: Run Trivy image scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          input: 'oci-log-integration-scan:latest'
+          ignore-unfixed: true
+          severity: 'HIGH,CRITICAL'
+          format: 'template'
+          template: '@/contrib/sarif.tpl'
+          output: 'trivy-image-results.sarif'
         env:
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
           TRIVY_GO_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-go-db
@@ -31,4 +57,6 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: |
+            trivy-fs-results.sarif
+            trivy-image-results.sarif
