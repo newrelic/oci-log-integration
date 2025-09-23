@@ -42,7 +42,7 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'image'
-          input: 'oci-log-integration-scan:latest'
+          image-ref: 'oci-log-integration-scan:latest'
           ignore-unfixed: true
           severity: 'HIGH,CRITICAL'
           format: 'template'
