@@ -1,6 +1,7 @@
 name: 'Repo Level Trivy Scan'
 
-pull_request:
+on:
+  pull_request:
     branches:
       - main
   workflow_dispatch:
