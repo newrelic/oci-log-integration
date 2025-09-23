@@ -1,4 +1,4 @@
-name: 'Simplified Trivy Scan'
+name: 'Trivy Security Scans'
 
 on:
   pull_request:
@@ -7,10 +7,38 @@ on:
   workflow_dispatch:
 
 jobs:
-  trivy:
-    name: Trivy security scan
+  trivy_fs_scan:
+    name: Trivy Filesystem Scan
     runs-on: ubuntu-latest
-    
+    permissions:
+      security-events: write # Required to upload SARIF results
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          ignore-unfixed: true
+          severity: 'HIGH,CRITICAL'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+
+      - name: Upload Trivy filesystem results to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-fs-results.sarif'
+
+  trivy_image_scan:
+    name: Trivy Docker Image Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write # Required to upload SARIF results
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -22,36 +50,16 @@ jobs:
           file: ./logs-function/Dockerfile
           load: true
           tags: oci-log-integration-scan:latest
-      
-      - name: Run Trivy filesystem scan
-        continue-on-error: true
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          ignore-unfixed: true
-          severity: 'HIGH,CRITICAL'
-          format: 'template'
-          template: '@/contrib/sarif.tpl'
-          output: 'trivy-fs-results.sarif'
 
       - name: Run Trivy image scan
-        continue-on-error: true
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'image'
           image-ref: 'oci-log-integration-scan:latest'
           ignore-unfixed: true
           severity: 'HIGH,CRITICAL'
-          format: 'template'
-          template: '@/contrib/sarif.tpl'
+          format: 'sarif'
           output: 'trivy-image-results.sarif'
-          
-      - name: Upload Trivy filesystem results to GitHub Security tab
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: 'trivy-fs-results.sarif'
 
       - name: Upload Trivy image results to GitHub Security tab
         if: always()
