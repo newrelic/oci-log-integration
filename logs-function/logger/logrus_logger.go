@@ -7,7 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// DebugEnabled is the environment variable name used to enable debug level logging.
+// DebugEnabled is the environment variable name used to enable debuglevel logging.
 const (
 	DebugEnabled = "DEBUG_ENABLED"
 )

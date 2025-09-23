@@ -2,7 +2,7 @@
 
 # --- Configuration Variables ---
 
-image_name="${IMAGE_NAME:-oci-logs-function}"
+image_name="${IMAGE_NAME:-oci-log-forwarder}"
 image_tag="${IMAGE_TAG:-latest}"
 
 
