@@ -1,7 +1,5 @@
 name: 'Repo Level Trivy Scan'
-permissions:
-  contents: read
-  security-events: write
+
 on:
   pull_request:
     branches:
@@ -9,29 +7,54 @@ on:
   workflow_dispatch:
 
 jobs:
-  trivy:
-    name: Trivy security scan
+  # 1st Job -- Build Docker Image and Push to GHCR
+  build:
+    name: 'Build and Push Docker Image'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image-name: ${{ steps.set-image-name.outputs.image-name }}
+
     steps:
-      - name: Checkout code
+      - name: 'Checkout code'
         uses: actions/checkout@v4
 
-      - name: Run Trivy vulnerability scanner sarif output
-        uses: aquasecurity/trivy-action@master
+      - name: 'Log in to GitHub Container Registry'
+        uses: docker/login-action@v3
         with:
-          scan-type: fs
-          ignore-unfixed: true
-          severity: 'HIGH,CRITICAL'
-          format: 'template'
-          template: '@/contrib/sarif.tpl'
-          output: 'trivy-results.sarif'
-          exit : 1
-        env:
-          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
-          TRIVY_GO_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-go-db
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+      - name: 'Build and push Docker image'
+        id: build-and-push
+        uses: docker/build-push-action@v6
         with:
-          sarif_file: 'trivy-results.sarif'
+          context: ./logs-function
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          # Path to the Dockerfile
+          file: ./logs-function/Dockerfile
+
+      - name: 'Set image name output'
+        id: set-image-name
+        run: echo "image-name=ghcr.io/${{ github.repository }}:${{ github.sha }}" >> $GITHUB_OUTPUT
+
+  # 2nd Job -- Call the reusable organization workflow for scanning
+  scan:
+    name: 'Trigger Organization Scan'
+    needs: build
+    permissions:
+      contents: write
+      packages: write
+      security-events: write
+      actions: write
+      id-token: write    
+      checks: write 
+    uses: newrelic-trivy/.github/.github/workflows/org-level-trivy-scan.yml@main
+    with:
+      image-name: ${{ needs.build.outputs.image-name }}
+    secrets: inherit
