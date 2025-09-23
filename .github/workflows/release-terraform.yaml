@@ -1,7 +1,7 @@
 name: Terraform Zip and Semantic Release
 
 on:
-  pull_request:
+  push:
     branches:
       - main
     paths:
