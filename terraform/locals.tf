@@ -11,22 +11,22 @@ locals {
   }
 
   # Names for the network infra
-  vcn_name         = "newrelic-${var.nr_prefix}-${var.region}-logs-vcn"
-  nat_gateway      = "newrelic-${var.nr_prefix}-${var.region}-natgateway"
-  service_gateway  = "newrelic-${var.nr_prefix}-${var.region}-servicegateway"
-  subnet           = "newrelic-${var.nr_prefix}-${var.region}-private-subnet"
-  internet_gateway = "newrelic-${var.nr_prefix}-${var.region}-internetgateway"
+  vcn_name         = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-vcn"
+  nat_gateway      = "newrelic-${var.newrelic_logging_identifier}-${var.region}-natgateway"
+  service_gateway  = "newrelic-${var.newrelic_logging_identifier}-${var.region}-servicegateway"
+  subnet           = "newrelic-${var.newrelic_logging_identifier}-${var.region}-private-subnet"
+  internet_gateway = "newrelic-${var.newrelic_logging_identifier}-${var.region}-internetgateway"
 
   # Function App Constants
-  function_app_name  = "newrelic-${var.nr_prefix}-${var.region}-logs-function-app"
+  function_app_name  = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function-app"
   function_app_shape = "GENERIC_X86"
   client_ttl         = 30
 
   # Function Constants
-  function_name          = "newrelic-${var.nr_prefix}-${var.region}-logs-function"
+  function_name          = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function"
   function_memory_in_mbs = "128"
   time_out_in_seconds    = 300
-  image_url              = "${var.region}.ocir.io/idptojlonu4e/newrelic-logs-integration/oci-log-forwarder:latest"
+  image_url              = "${var.region}.ocir.io/idptojlonu4e/newrelic-logs-integration/oci-log-forwarder:${var.image_version}"
 
   # connector hub config
   batch_size_in_kbs = 6000

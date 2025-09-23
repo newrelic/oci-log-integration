@@ -8,9 +8,10 @@ variable "compartment_ocid" {
   description = "The OCID of the compartment where resources will be created. Do not modify."
 }
 
-variable "nr_prefix" {
+variable "newrelic_logging_identifier" {
   type        = string
-  description = "The prefix for naming all the logging resources in this module."
+  description = "A unique label or name identifier for all resources in this deployment. Leave it blank if not needed."
+  default     = "logs"
 }
 
 variable "region" {
@@ -52,4 +53,10 @@ variable "debug_enabled" {
   type        = string
   default     = "FALSE"
   description = "Enable debug mode."
+}
+
+variable "image_version" {
+  type        = string
+  description = "The version of the Docker image for the New Relic function for the region."
+  default     = "latest"
 }

@@ -11,9 +11,10 @@ variableGroups:
     visible: true
     variables:
       - ${new_relic_region}
-      - ${nr_prefix}
+      - ${newrelic_logging_identifier}
       - ${newrelic_account_id}
       - ${payload_link}
+      - ${image_version}
 
   - title: "Network options"
     variables:
@@ -44,12 +45,12 @@ variables:
     required: true
     visible: false
 
-  nr_prefix:
+  newrelic_logging_identifier:
     type: string
     title: New Relic logging prefix
-    description: The prefix to use for New Relic logging resources for Function and VCNs.
+    description: A unique label or name identifier for all resources in this deployment. Leave it blank if not needed.
     required: true
-    default: logging
+    default: logs
 
   new_relic_region:
     type: enum
