@@ -47,13 +47,6 @@ jobs:
   scan:
     name: 'Trigger Organization Scan'
     needs: build
-    permissions:
-      contents: write
-      packages: write
-      security-events: write
-      actions: write
-      id-token: write    
-      checks: write 
     uses: newrelic-trivy/.github/.github/workflows/org-level-trivy-scan.yml@main
     with:
       image-name: ${{ needs.build.outputs.image-name }}
