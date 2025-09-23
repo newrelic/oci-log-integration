@@ -10,7 +10,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      # Required to create/delete releases and tags
+      # Required to create/delete releases andtags
       contents: write
 
     steps:
