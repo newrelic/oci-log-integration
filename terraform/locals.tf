@@ -9,12 +9,28 @@ locals {
   freeform_tags = {
     newrelic-terraform = "true"
   }
+
   # Names for the network infra
   vcn_name         = "newrelic-${var.nr_prefix}-${var.region}-logs-vcn"
-  nat_gateway      = "${local.vcn_name}-natgateway"
-  service_gateway  = "${local.vcn_name}-servicegateway"
-  subnet           = "${local.vcn_name}-private-subnet"
-  internet_gateway = "${local.vcn_name}-internetgateway"
+  nat_gateway      = "newrelic-${var.nr_prefix}-${var.region}-natgateway"
+  service_gateway  = "newrelic-${var.nr_prefix}-${var.region}-servicegateway"
+  subnet           = "newrelic-${var.nr_prefix}-${var.region}-private-subnet"
+  internet_gateway = "newrelic-${var.nr_prefix}-${var.region}-internetgateway"
+
+  # Function App Constants
+  function_app_name  = "newrelic-${var.nr_prefix}-${var.region}-logs-function-app"
+  function_app_shape = "GENERIC_X86"
+  client_ttl         = 30
+
+  # Function Constants
+  function_name          = "newrelic-${var.nr_prefix}-${var.region}-logs-function"
+  function_memory_in_mbs = "128"
+  time_out_in_seconds    = 300
+  image_url              = "${var.region}.ocir.io/idptojlonu4e/newrelic-logs-integration/oci-log-forwarder:latest"
+
+  # connector hub config
+  batch_size_in_kbs = 6000
+  batch_time_in_sec = 60
 
   connectors             = jsondecode(data.external.connector_payload.result.connectors)
   compartment_ocid       = data.external.connector_payload.result.compartment_id
@@ -28,31 +44,25 @@ locals {
   connectors_map = {
     for conn in local.connectors : conn.display_name => conn
   }
-  newrelic_graphql_endpoint       = "https://api.newrelic.com/graphql"
+  newrelic_graphql_endpoint = {
+    US = "https://api.newrelic.com/graphql"
+    EU = "https://api.eu.newrelic.com/graphql"
+  }[var.new_relic_region]
   updateLinkAccount_graphql_query = <<EOF
 mutation {
   cloudUpdateAccount(
     accountId: ${var.newrelic_account_id}
-    accounts = {
-      oci = {
+    accounts: {
+      oci: {
         compartmentOcid: "${local.compartment_ocid}"
-        linkedAccountId: "${local.providerAccountId}"
+        linkedAccountId: ${local.providerAccountId}
         loggingStackOcid: "${local.stack_id}"
-        ociHomeRegion: "${local.home_region}"
-        tenantId: "${var.tenancy_ocid}"
         ociRegion: "${var.region}"
         userVaultOcid: "${local.user_key_secret_ocid}"
         ingestVaultOcid: "${local.ingest_key_secret_ocid}"
       }
   }
 ) {
-    errors {
-      linkedAccountId
-      providerSlug
-      message
-      nrAccountId
-      type
-    }
     linkedAccounts {
       id
       authLabel
