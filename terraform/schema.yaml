@@ -81,7 +81,14 @@ variables:
     description: The link to the payload for the connector hubs.
     type: string
     required: true
-    visible: true
+    default: logs
+  
+  image_version:
+    title: Docker Image Version
+    description: Version of the docker image to use
+    type: string
+    required: true
+    default: latest
 
   vcnCompartment:
     type: oci:identity:compartment:id
