@@ -14,7 +14,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o function main.go
 
 # Final stage: minimal image for OCI Functions
-FROM fnproject/go:1.24.6
+FROM fnproject/go:1.24
 
 WORKDIR /function
 
