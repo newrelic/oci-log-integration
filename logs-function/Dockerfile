@@ -1,5 +1,5 @@
 # Build stage: compile Go binary
-FROM golang:1.24.4 AS build-stage
+FROM golang:1.24.6 AS build-stage
 
 WORKDIR /function
 
@@ -14,7 +14,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o function main.go
 
 # Final stage: minimal image for OCI Functions
-FROM fnproject/go:1.24
+FROM fnproject/go:1.24.6
 
 WORKDIR /function
 
