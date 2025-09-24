@@ -36,13 +36,39 @@ resource "oci_functions_application" "logging_function_app" {
   ]
 }
 
+#Resource for creating a log group for function logs
+resource "oci_logging_log_group" "function_log_group" {
+  compartment_id = var.compartment_ocid
+  display_name   = local.function_app_log_group_name
+  description    = "Log group for logging function logs"
+  freeform_tags  = local.freeform_tags
+}
+#Resource for creating a log  and associate it with the function
+resource "oci_logging_log" "function_execution_log" {
+  depends_on   = [oci_functions_function.logging_function]
+  display_name = local.function_app_log_name
+  log_group_id = oci_logging_log_group.function_log_group.id
+  log_type     = "SERVICE"
+  configuration {
+    source {
+      category    = "invoke"
+      resource    = oci_functions_application.logging_function_app.id
+      service     = "functions"
+      source_type = "OCISERVICE"
+    }
+    compartment_id = var.compartment_ocid
+  }
+  is_enabled    = true
+  freeform_tags = local.freeform_tags
+}
+
 # Resource for the function
 resource "oci_functions_function" "logging_function" {
   depends_on = [oci_functions_application.logging_function_app]
 
   application_id     = oci_functions_application.logging_function_app.id
   display_name       = local.function_name
-  memory_in_mbs      = local.memory_in_mbs
+  memory_in_mbs      = local.function_memory_in_mbs
   timeout_in_seconds = local.time_out_in_seconds
 
   defined_tags  = {}
