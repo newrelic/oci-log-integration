@@ -24,7 +24,7 @@ locals {
 
   # Function Constants
   function_name          = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function"
-  function_memory_in_mbs = "128"
+  memory_in_mbs = "128"
   time_out_in_seconds    = 300
   image_url              = "${var.region}.ocir.io/idptojlonu4e/newrelic-logs-integration/oci-log-forwarder:${var.image_version}"
 
