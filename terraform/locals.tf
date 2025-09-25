@@ -18,15 +18,17 @@ locals {
   internet_gateway = "newrelic-${var.newrelic_logging_identifier}-${var.region}-internetgateway"
 
   # Function App Constants
-  function_app_name  = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function-app"
-  function_app_shape = "GENERIC_X86"
-  client_ttl         = 30
+  function_app_name           = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function-app"
+  function_app_shape          = "GENERIC_X86"
+  client_ttl                  = 30
+  function_app_log_group_name = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function-log-group"
+  function_app_log_name       = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function-log"
 
   # Function Constants
-  function_name          = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function"
-  function_memory_in_mbs = "128"
-  time_out_in_seconds    = 300
-  image_url              = "${var.region}.ocir.io/idptojlonu4e/newrelic-logs-integration/oci-log-forwarder:${var.image_version}"
+  function_name       = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function"
+  memory_in_mbs       = "128"
+  time_out_in_seconds = 300
+  image_url           = "${var.region}.ocir.io/idptojlonu4e/newrelic-logs-integration/oci-log-forwarder:${var.image_version}"
 
   # connector hub config
   batch_size_in_kbs = 6000
