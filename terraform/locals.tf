@@ -21,8 +21,8 @@ locals {
   function_app_name           = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function-app"
   function_app_shape          = "GENERIC_X86"
   client_ttl                  = 30
-  function_app_log_group_name = "${var.newrelic_logging_identifier}-${var.region}-function-app-log-group"
-  function_app_log_name       = "${local.function_app_name}-execution-log"
+  function_app_log_group_name = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function-log-group"
+  function_app_log_name       = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function-log"
 
   # Function Constants
   function_name       = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function"
