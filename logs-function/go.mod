@@ -4,7 +4,7 @@ go 1.24.6
 
 require (
 	github.com/fnproject/fdk-go v0.0.60
-	github.com/newrelic/newrelic-client-go/v2 v2.44.0
+	github.com/newrelic/newrelic-client-go/v2 v2.83.3
 	github.com/oracle/oci-go-sdk/v65 v65.96.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0

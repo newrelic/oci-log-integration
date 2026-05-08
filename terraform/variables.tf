@@ -22,7 +22,7 @@ variable "region" {
 variable "new_relic_region" {
   type        = string
   default     = "US"
-  description = "New Relic Region. US or EU"
+  description = "New Relic Region. US, EU, or JP"
 }
 
 variable "newrelic_account_id" {
