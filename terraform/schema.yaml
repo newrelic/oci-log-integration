@@ -54,13 +54,14 @@ variables:
 
   new_relic_region:
     type: enum
-    title: "New Relic Region. US or EU"
-    description: "Datacenter where the data will be sent (US/EU)"
+    title: "New Relic Region. US, EU, or JP"
+    description: "Datacenter where the data will be sent (US/EU/JP)"
     required: true
     default: "US"
     enum:
       - "US"
       - "EU"
+      - "JP"
 
   newrelic_account_id:
     type: string
