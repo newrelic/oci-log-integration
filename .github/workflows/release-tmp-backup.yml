@@ -1,0 +1,37 @@
+name: Terraform Release 1.1.0
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to create/delete releases andtags
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Zip terraform folder
+        run: |
+          zip -r oci-log-integration.zip terraform
+
+      - name: Create and push new 1.1.0 tag
+        run: |
+          git tag 1.1.0
+          git push origin 1.1.0
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "1.1.0"
+          name: "oci-log-integration 1.1.0"
+          body: "Static release of the OCI Log Integration Terraform module."
+          files: oci-log-integration.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
