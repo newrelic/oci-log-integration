@@ -16,9 +16,14 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o function main.go
 # Final stage: minimal image for OCI Functions
 FROM fnproject/go:1.24
 
-# Patch OS packages to clear known CVEs in the base image (e.g. glibc
-# CVE-2026-5450, flagged HIGH by the Oracle Linux vendor severity in Trivy).
-RUN microdnf update -y && microdnf clean all
+# Patch glibc in the base image to clear CVE-2026-5450 (flagged HIGH by the
+# Oracle Linux vendor severity in Trivy). Pinned to the resolved fix version
+# for reproducible builds; bump when the Trivy scan flags a newer CVE.
+RUN microdnf install -y \
+      glibc-2.34-272.0.1.el9_8 \
+      glibc-common-2.34-272.0.1.el9_8 \
+      glibc-minimal-langpack-2.34-272.0.1.el9_8 \
+    && microdnf clean all
 
 WORKDIR /function
 
