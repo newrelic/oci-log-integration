@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # Go modules for the OCI logs function
+  - package-ecosystem: "gomod"
+    directory: "/logs-function"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  # GitHub Actions used by the workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  # Base images referenced in the Dockerfile
+  - package-ecosystem: "docker"
+    directory: "/logs-function"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
