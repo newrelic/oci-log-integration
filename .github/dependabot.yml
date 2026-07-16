@@ -8,6 +8,9 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
+    commit-message:
+      prefix: "build"
+      include: "scope"
 
   # GitHub Actions used by the workflows
   - package-ecosystem: "github-actions"
@@ -17,6 +20,9 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
+    commit-message:
+      prefix: "build"
+      include: "scope"
 
   # Base images referenced in the Dockerfile
   - package-ecosystem: "docker"
@@ -26,3 +32,6 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
+    commit-message:
+      prefix: "build"
+      include: "scope"
