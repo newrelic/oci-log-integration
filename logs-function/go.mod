@@ -7,7 +7,7 @@ require (
 	github.com/newrelic/newrelic-client-go/v2 v2.91.1
 	github.com/oracle/oci-go-sdk/v65 v65.121.0
 	github.com/sirupsen/logrus v1.9.3
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 )
 
 require (
