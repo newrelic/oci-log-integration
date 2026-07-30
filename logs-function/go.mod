@@ -3,7 +3,7 @@ module github.com/newrelic/oci-log-integration/logs-function
 go 1.25.9
 
 require (
-	github.com/fnproject/fdk-go v0.0.60
+	github.com/fnproject/fdk-go v0.1.15
 	github.com/newrelic/newrelic-client-go/v2 v2.91.1
 	github.com/oracle/oci-go-sdk/v65 v65.121.0
 	github.com/sirupsen/logrus v1.9.4
