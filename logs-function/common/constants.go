@@ -37,3 +37,24 @@ const LicenseKey = "licenseKey"
 
 // Message channel size
 const MessageChannelSize = 10
+
+// CursorEnabled is the environment variable name that toggles per-log-group
+// deduplication of records re-delivered after a Service Connector update. It is
+// OFF by default; set to "true" to enable. See the cursor package.
+const CursorEnabled = "CURSOR_ENABLED"
+
+// CursorNamespace is the environment variable name for the Object Storage
+// namespace that holds cursor state.
+const CursorNamespace = "CURSOR_NAMESPACE"
+
+// CursorBucket is the environment variable name for the Object Storage bucket
+// that holds cursor state.
+const CursorBucket = "CURSOR_BUCKET"
+
+// CursorPrefix is the environment variable name for an optional object-name
+// prefix under which cursor state is written (e.g. "nr-logs/").
+const CursorPrefix = "CURSOR_PREFIX"
+
+// CursorRegion is the environment variable name for an optional region override
+// for the Object Storage client. Defaults to the Resource Principal home region.
+const CursorRegion = "CURSOR_REGION"

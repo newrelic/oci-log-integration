@@ -6,10 +6,12 @@ package main
 import (
 	"context"
 	"io"
+	"os"
 	"sync"
 
 	"github.com/fnproject/fdk-go"
 	"github.com/newrelic/oci-log-integration/logs-function/common"
+	"github.com/newrelic/oci-log-integration/logs-function/cursor"
 	"github.com/newrelic/oci-log-integration/logs-function/logger"
 	"github.com/newrelic/oci-log-integration/logs-function/loggroup"
 	"github.com/newrelic/oci-log-integration/logs-function/unmarshal"
@@ -58,7 +60,8 @@ func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nr
 
 	switch event.EventType {
 	case unmarshal.OCI_LOGGING:
-		loggroup.ProcessLogs(event.OCILoggingEvent, channel)
+		records := applyCursorDedup(ctx, event.OCILoggingEvent)
+		loggroup.ProcessLogs(records, channel)
 	default:
 		log.Warnf("Unknown event type: %s", event.EventType)
 	}
@@ -67,4 +70,23 @@ func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nr
 	close(channel)
 	// Wait for goroutines to finish processing
 	wg.Wait()
+}
+
+// applyCursorDedup drops records already ingested during a Service Connector
+// re-ingest window, using per-log-group high-water marks in Object Storage. It is
+// gated behind the CURSOR_ENABLED flag (OFF by default) and fails open: if the
+// flag is off or config is missing, all records are forwarded unchanged.
+func applyCursorDedup(ctx context.Context, records common.OCILoggingEvent) common.OCILoggingEvent {
+	if os.Getenv(common.CursorEnabled) != "true" {
+		return records
+	}
+
+	namespace := os.Getenv(common.CursorNamespace)
+	bucket := os.Getenv(common.CursorBucket)
+	if namespace == "" || bucket == "" {
+		log.Warnf("cursor dedup enabled but %s/%s not set; forwarding without dedup", common.CursorNamespace, common.CursorBucket)
+		return records
+	}
+
+	return cursor.Apply(ctx, namespace, bucket, os.Getenv(common.CursorPrefix), records)
 }
