@@ -1,0 +1,12 @@
+schema_version: 20180708
+name: nr-logging-reconciler
+version: 0.0.1
+runtime: docker
+memory: 256
+timeout: 120
+# Set at deploy time (fn config / terraform application config):
+#   SERVICE_CONNECTOR_OCID  (required) OCID of the SCH connector to keep in sync
+#   CONNECTOR_REGION        (optional) region to pin the SCH client to
+#   DEBUG_ENABLED           (optional) "true" for debug logging
+config:
+  DEBUG_ENABLED: "false"

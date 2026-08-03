@@ -88,5 +88,11 @@ func applyCursorDedup(ctx context.Context, records common.OCILoggingEvent) commo
 		return records
 	}
 
-	return cursor.Apply(ctx, namespace, bucket, os.Getenv(common.CursorPrefix), records)
+	store, err := cursor.NewObjectStore(namespace, bucket, os.Getenv(common.CursorPrefix), os.Getenv(common.CursorRegion))
+	if err != nil {
+		log.Warnf("cursor store init failed, forwarding without dedup: %v", err)
+		return records
+	}
+
+	return cursor.Apply(ctx, store, log, records)
 }
