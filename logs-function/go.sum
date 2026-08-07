@@ -26,8 +26,8 @@ github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWE
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/newrelic/newrelic-client-go/v2 v2.91.1 h1:9/7hramwf4ABClDGhpWf4w8aBqx7IXSufLSUXkDvfak=
 github.com/newrelic/newrelic-client-go/v2 v2.91.1/go.mod h1:kROngr/zeNyxbdOI3zPK4Al+ze32XjLEVUDzjxsKW9g=
-github.com/oracle/oci-go-sdk/v65 v65.121.0 h1:1J+5ARgrodrx8kzFy/hxznaoUzz43jr0EestCzEaOHw=
-github.com/oracle/oci-go-sdk/v65 v65.121.0/go.mod h1:Pzy+BpgkDesvGZXEHgslwhIYobHCPHg6wRta1mWnlqQ=
+github.com/oracle/oci-go-sdk/v65 v65.123.0 h1:OjoeFzFMIGqNLJzto+lmI8gLzLc0LhmlOAIO5qKzBDs=
+github.com/oracle/oci-go-sdk/v65 v65.123.0/go.mod h1:Pzy+BpgkDesvGZXEHgslwhIYobHCPHg6wRta1mWnlqQ=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
