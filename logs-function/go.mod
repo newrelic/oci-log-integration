@@ -1,6 +1,8 @@
 module github.com/newrelic/oci-log-integration/logs-function
 
-go 1.25.9
+go 1.26.0
+
+toolchain go1.26.6
 
 require (
 	github.com/fnproject/fdk-go v0.1.15
