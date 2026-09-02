@@ -6,12 +6,14 @@ package main
 import (
 	"context"
 	"io"
+	"os"
 	"sync"
 
 	"github.com/fnproject/fdk-go"
 	"github.com/newrelic/oci-log-integration/logs-function/common"
 	"github.com/newrelic/oci-log-integration/logs-function/logger"
 	"github.com/newrelic/oci-log-integration/logs-function/loggroup"
+	"github.com/newrelic/oci-log-integration/logs-function/resource"
 	"github.com/newrelic/oci-log-integration/logs-function/unmarshal"
 	"github.com/newrelic/oci-log-integration/logs-function/util"
 )
@@ -58,7 +60,15 @@ func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nr
 
 	switch event.EventType {
 	case unmarshal.OCI_LOGGING:
-		loggroup.ProcessLogs(event.OCILoggingEvent, channel)
+		logs := event.OCILoggingEvent
+		if resourceNameEnrichmentEnabled() {
+			if searchClient, err := util.NewResourceSearchClient(); err != nil {
+				log.Warnf("resource search client unavailable, skipping resource name enrichment: %v", err)
+			} else {
+				logs = resource.EnrichRecords(ctx, logs, util.NewResourceSearchResolver(searchClient))
+			}
+		}
+		loggroup.ProcessLogs(logs, channel)
 	default:
 		log.Warnf("Unknown event type: %s", event.EventType)
 	}
@@ -67,4 +77,13 @@ func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nr
 	close(channel)
 	// Wait for goroutines to finish processing
 	wg.Wait()
+}
+
+// resourceNameEnrichmentEnabled reports whether the OCID -> resource name enrichment feature is
+// turned on via RESOURCE_NAME_ENRICHMENT_ENABLED. Unset or anything other than "true" means off
+// -- in that case handleFunctionWithClient never calls util.NewResourceSearchClient or
+// resource.EnrichRecords at all, so log forwarding behaves exactly as it did before this feature
+// existed.
+func resourceNameEnrichmentEnabled() bool {
+	return os.Getenv(common.ResourceNameEnrichmentEnabled) == "true"
 }
