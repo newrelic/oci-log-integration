@@ -40,6 +40,12 @@ locals {
   user_key_secret_ocid   = data.external.connector_payload.result.user_key_secret_ocid
   providerAccountId      = data.external.connector_payload.result.provider_account_id
 
+  # The tenancy's root compartment shares its OCID with the tenancy itself, but OCI's
+  # Identity service can't return it from GetCompartment (data.oci_identity_compartment) --
+  # only GetTenancy can. Detect that case so we read the name from the right data source.
+  is_root_compartment = local.compartment_ocid == var.tenancy_ocid
+  compartment_name    = local.is_root_compartment ? data.oci_identity_tenancy.current_tenancy.name : data.oci_identity_compartment.current_compartment[0].name
+
   user_api_key = base64decode(data.oci_secrets_secretbundle.user_api_key.secret_bundle_content[0].content)
   stack_id     = data.oci_resourcemanager_stacks.current_stack.stacks[0].id
 
