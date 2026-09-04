@@ -28,6 +28,12 @@ const ClientTTL = "CLIENT_TTL"
 // DefaultClientTTL is the default TTL for the NewRelic client cache in seconds (10 minutes = 600 seconds).
 const DefaultClientTTL = 600
 
+// NegativeCacheTTLSeconds bounds how long a failed license-key fetch or Metrics client
+// creation is cached before being retried, in seconds. Kept much shorter than
+// ClientTTL/DefaultClientTTL so a transient Vault blip or config error recovers quickly
+// instead of being replayed as a cached failure for the full success-case TTL.
+const NegativeCacheTTLSeconds = 30
+
 // MaxPayloadSize is the maximum size of a payload.
 // Reference: https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/#limits
 const MaxPayloadSize = 1 * 1024 * 1024 // 1 mb

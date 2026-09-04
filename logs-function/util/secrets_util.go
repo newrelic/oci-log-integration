@@ -101,12 +101,14 @@ var (
 // GetLicenseKey returns the license key from the OCI Secrets Manager. TTL-cached (same
 // window as the New Relic client caches, see getClientTTL) so that the logs client and the
 // metrics client -- both of which call this -- share a single Vault fetch per cache window
-// instead of one each.
+// instead of one each. A cached fetch failure is held for only NegativeCacheTTLSeconds
+// (much shorter than the success-case TTL), so a transient Vault blip doesn't get replayed
+// as a cached error for the full window.
 func GetLicenseKey() (key string, err error) {
 	licenseKeyCacheMu.Lock()
 	defer licenseKeyCacheMu.Unlock()
 
-	if !licenseKeyCachedAt.IsZero() && time.Since(licenseKeyCachedAt) < getClientTTL() {
+	if !licenseKeyCachedAt.IsZero() && time.Since(licenseKeyCachedAt) < cacheTTL(cachedLicenseKeyErr) {
 		return cachedLicenseKey, cachedLicenseKeyErr
 	}
 
@@ -114,6 +116,19 @@ func GetLicenseKey() (key string, err error) {
 	licenseKeyCachedAt = time.Now()
 
 	return cachedLicenseKey, cachedLicenseKeyErr
+}
+
+// cacheTTL returns the TTL to apply for the currently cached result: the configured
+// success-case TTL, or the much shorter negative-cache TTL when the cached result is an
+// error -- whichever is smaller, so an explicitly short CLIENT_TTL is still honored.
+func cacheTTL(cachedErr error) time.Duration {
+	ttl := getClientTTL()
+	if cachedErr != nil {
+		if negTTL := time.Duration(common.NegativeCacheTTLSeconds) * time.Second; negTTL < ttl {
+			ttl = negTTL
+		}
+	}
+	return ttl
 }
 
 // fetchLicenseKey does the actual Vault round-trip, uncached.

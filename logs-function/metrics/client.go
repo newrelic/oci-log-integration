@@ -40,12 +40,15 @@ var (
 )
 
 // NewClient returns a TTL-cached New Relic Metrics API client, mirroring the caching
-// pattern already used for the logs client in util.NewNRClient.
+// pattern already used for the logs client in util.NewNRClient. A cached creation failure
+// is held for only NegativeCacheTTLSeconds (much shorter than the success-case TTL), so a
+// transient failure (bad region, license key fetch error) doesn't silently block the
+// metrics flush for the full window.
 func NewClient(getLicenseKey LicenseKeyFunc) (ClientAPI, error) {
 	clientCacheMu.Lock()
 	defer clientCacheMu.Unlock()
 
-	if cachedClient != nil && time.Since(clientCachedAt) < clientTTL() {
+	if !clientCachedAt.IsZero() && time.Since(clientCachedAt) < cacheTTL(cachedClientErr) {
 		return cachedClient, cachedClientErr
 	}
 
@@ -53,6 +56,19 @@ func NewClient(getLicenseKey LicenseKeyFunc) (ClientAPI, error) {
 	clientCachedAt = time.Now()
 
 	return cachedClient, cachedClientErr
+}
+
+// cacheTTL returns the TTL to apply for the currently cached result: the configured
+// success-case TTL, or the much shorter negative-cache TTL when the cached result is an
+// error -- whichever is smaller, so an explicitly short CLIENT_TTL is still honored.
+func cacheTTL(cachedErr error) time.Duration {
+	ttl := clientTTL()
+	if cachedErr != nil {
+		if negTTL := time.Duration(common.NegativeCacheTTLSeconds) * time.Second; negTTL < ttl {
+			ttl = negTTL
+		}
+	}
+	return ttl
 }
 
 func clientTTL() time.Duration {

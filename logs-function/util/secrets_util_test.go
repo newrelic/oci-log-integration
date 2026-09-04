@@ -255,6 +255,35 @@ func resetLicenseKeyCache() {
 	licenseKeyCachedAt = time.Time{}
 }
 
+// A failed Vault fetch must not be cached for the full (default 10-minute) success-case
+// TTL: that would silently block both the logs and metrics clients from recovering from one
+// transient Vault blip for the whole window.
+func TestCacheTTL_CachedErrorUsesShorterNegativeTTL(t *testing.T) {
+	defer os.Unsetenv(common.ClientTTL)
+	assert.NoError(t, os.Unsetenv(common.ClientTTL)) // default (600s) success-case TTL
+
+	ttl := cacheTTL(errors.New("boom"))
+
+	assert.Equal(t, time.Duration(common.NegativeCacheTTLSeconds)*time.Second, ttl)
+}
+
+// An explicitly configured CLIENT_TTL shorter than the negative-cache TTL must still be
+// honored for a cached error, rather than being lengthened.
+func TestCacheTTL_CachedErrorHonorsShorterConfiguredTTL(t *testing.T) {
+	defer os.Unsetenv(common.ClientTTL)
+	assert.NoError(t, os.Setenv(common.ClientTTL, "1"))
+
+	assert.Equal(t, 1*time.Second, cacheTTL(errors.New("boom")))
+}
+
+// A cached success is unaffected: it keeps the full configured TTL.
+func TestCacheTTL_CachedSuccessUsesConfiguredTTL(t *testing.T) {
+	defer os.Unsetenv(common.ClientTTL)
+	assert.NoError(t, os.Unsetenv(common.ClientTTL))
+
+	assert.Equal(t, getClientTTL(), cacheTTL(nil))
+}
+
 // Helper function to extract license key from secret (for testing)
 func extractLicenseKeyFromSecret(secretValue string) (string, error) {
 	if secretValue == "" {
