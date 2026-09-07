@@ -35,6 +35,9 @@ func main() {
 func handleFunction(ctx context.Context, in io.Reader, out io.Writer) {
 	rec := metrics.NewRecorder(commonMetricAttributes())
 
+	// Registered first (so it runs last, after the run-duration summary below is recorded --
+	// defers execute LIFO) to guarantee forwarder.run.duration is in rec before flushMetrics
+	// sends it, no matter how many more defers get added between here and the flush.
 	defer func() {
 		status := "success"
 		panicked := recover()
@@ -50,17 +53,23 @@ func handleFunction(ctx context.Context, in io.Reader, out io.Writer) {
 		}
 	}()
 
-	// Create NewRelic client during function invocation, not startup
-	nrClient, err := util.NewNRClient(rec)
-	if err != nil {
-		rec.Count(metrics.TierAdvanced, metrics.MetricSecretFetchErrors, 1, nil)
-		log.Panicf("error initializing newrelic client: %v", err)
-	}
-
+	// Started and deferred before the NewNRClient call (rather than after it returns) so that
+	// a cold-cache Vault round-trip is included in forwarder.run.duration, and so the summary
+	// still gets recorded (via panic unwind) even if NewNRClient itself fails and panics below.
+	// Registered second (after the flush defer above) so it runs first, before the flush.
 	runStart := time.Now()
 	defer func() {
 		rec.Summary(metrics.TierAdvanced, metrics.MetricRunDuration, time.Since(runStart).Seconds(), nil)
 	}()
+
+	// Create NewRelic client during function invocation, not startup
+	nrClient, err := util.NewNRClient(rec)
+	if err != nil {
+		// Named/tagged by actual cause (region misconfig vs. Vault/license-key fetch failure)
+		// rather than assuming every NewNRClient failure is a secret-fetch problem.
+		rec.Count(metrics.TierAdvanced, metrics.MetricClientInitErrors, 1, map[string]interface{}{"error_class": util.NRClientErrorClass(err)})
+		log.Panicf("error initializing newrelic client: %v", err)
+	}
 
 	handleFunctionWithClient(ctx, in, out, nrClient, rec)
 }

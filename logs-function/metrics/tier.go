@@ -55,17 +55,17 @@ const (
 	MetricPipelineLag         = "forwarder.pipeline.lag"
 	MetricPipelineLagNegative = "forwarder.pipeline.lag.negative"
 
-	MetricSecretFetchErrors = "forwarder.secret.fetch.errors"
-	MetricRunDuration       = "forwarder.run.duration"
-	MetricDeliveryErrors    = "forwarder.delivery.errors"
-	MetricBytesDelivered    = "forwarder.bytes.delivered"
-	MetricClientCache       = "forwarder.client.cache"
-	MetricBytesReceived     = "forwarder.bytes.received"
-	MetricDecodeErrors      = "forwarder.decode.errors"
-	MetricSerializeErrors   = "forwarder.serialize.errors"
-	MetricRecordsOversized  = "forwarder.records.oversized"
-	MetricBatchesCreated    = "forwarder.batches.created"
-	MetricBatchSizeBytes    = "forwarder.batch.size_bytes"
+	MetricClientInitErrors = "forwarder.client.init.errors"
+	MetricRunDuration      = "forwarder.run.duration"
+	MetricDeliveryErrors   = "forwarder.delivery.errors"
+	MetricBytesDelivered   = "forwarder.bytes.delivered"
+	MetricClientCache      = "forwarder.client.cache"
+	MetricBytesReceived    = "forwarder.bytes.received"
+	MetricDecodeErrors     = "forwarder.decode.errors"
+	MetricSerializeErrors  = "forwarder.serialize.errors"
+	MetricRecordsOversized = "forwarder.records.oversized"
+	MetricBatchesCreated   = "forwarder.batches.created"
+	MetricBatchSizeBytes   = "forwarder.batch.size_bytes"
 )
 
 // MetricTiers documents which tier each forwarder.* metric is declared at, purely for
@@ -81,15 +81,15 @@ var MetricTiers = map[string]Tier{
 	MetricPipelineLag:         TierBasic,
 	MetricPipelineLagNegative: TierBasic,
 
-	MetricSecretFetchErrors: TierAdvanced,
-	MetricRunDuration:       TierAdvanced,
-	MetricDeliveryErrors:    TierAdvanced,
-	MetricBytesDelivered:    TierAdvanced,
-	MetricClientCache:       TierAdvanced,
-	MetricBytesReceived:     TierAdvanced,
-	MetricDecodeErrors:      TierAdvanced,
-	MetricSerializeErrors:   TierAdvanced,
-	MetricRecordsOversized:  TierAdvanced,
-	MetricBatchesCreated:    TierAdvanced,
-	MetricBatchSizeBytes:    TierAdvanced,
+	MetricClientInitErrors: TierAdvanced,
+	MetricRunDuration:      TierAdvanced,
+	MetricDeliveryErrors:   TierAdvanced,
+	MetricBytesDelivered:   TierAdvanced,
+	MetricClientCache:      TierAdvanced,
+	MetricBytesReceived:    TierAdvanced,
+	MetricDecodeErrors:     TierAdvanced,
+	MetricSerializeErrors:  TierAdvanced,
+	MetricRecordsOversized: TierAdvanced,
+	MetricBatchesCreated:   TierAdvanced,
+	MetricBatchSizeBytes:   TierAdvanced,
 }

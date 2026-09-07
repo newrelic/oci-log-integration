@@ -4,6 +4,7 @@ package util
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -82,17 +83,16 @@ func countBatchEntries(batch common.DetailedLogsBatch) int {
 
 // NewNRClient Initializes a new NRClient with debug level and region
 // It returns a NewRelicClientAPI interface and an error if there is a problem setting the region.
-// Uses TTL-based caching for performance in OCI Function environment. rec may be nil.
+// Uses TTL-based caching for performance in OCI Function environment. A cached failure is held
+// for only NegativeCacheTTLSeconds (much shorter than the success-case TTL), so a transient
+// error doesn't get replayed -- and re-increment failure metrics -- for the full TTL. rec may be nil.
 func NewNRClient(rec *metrics.Recorder) (NewRelicClientAPI, error) {
 	// Check if cache is still valid
-	if cachedNRClient != nil {
-		ttl := getClientTTL()
-		if time.Since(clientCacheTime) < ttl {
-			// Return cached client (even if there was an error before)
-			log.Debug("Returning cached New Relic client")
-			rec.Count(metrics.TierAdvanced, metrics.MetricClientCache, 1, map[string]interface{}{"result": "hit"})
-			return cachedNRClient, nrClientError
-		}
+	if !clientCacheTime.IsZero() && time.Since(clientCacheTime) < cacheTTL(nrClientError) {
+		// Return cached client (even if there was an error before)
+		log.Debug("Returning cached New Relic client")
+		rec.Count(metrics.TierAdvanced, metrics.MetricClientCache, 1, map[string]interface{}{"result": "hit"})
+		return cachedNRClient, nrClientError
 	}
 
 	// Cache is invalid, expired, or doesn't exist - create new client
@@ -121,6 +121,36 @@ func getClientTTL() time.Duration {
 	return time.Duration(ttlSeconds) * time.Second
 }
 
+// clientErrorClass is the reason NewNRClient/createNRClient failed to build a client, so
+// callers can label observability metrics by actual cause instead of lumping a region
+// misconfig and a Vault/license-key fetch failure into one bucket.
+type clientErrorClass string
+
+const (
+	clientErrorClassRegion clientErrorClass = "region_config"
+	clientErrorClassSecret clientErrorClass = "secret_fetch"
+)
+
+// classifiedError associates a createNRClient failure with the stage that caused it.
+type classifiedError struct {
+	class clientErrorClass
+	err   error
+}
+
+func (e *classifiedError) Error() string { return e.err.Error() }
+func (e *classifiedError) Unwrap() error { return e.err }
+
+// NRClientErrorClass returns a stable label for why err (as returned by NewNRClient) failed,
+// for use as an "error_class" metric attribute. Returns "unknown" for a nil or unrecognized
+// error.
+func NRClientErrorClass(err error) string {
+	var ce *classifiedError
+	if errors.As(err, &ce) {
+		return string(ce.class)
+	}
+	return "unknown"
+}
+
 // createNRClient creates a new NewRelic client instance
 func createNRClient() (NewRelicClientAPI, error) {
 	nrRegion, err := region.Get(region.Name(os.Getenv(common.NewRelicRegion)))
@@ -139,11 +169,14 @@ func createNRClient() (NewRelicClientAPI, error) {
 	}
 
 	if err := cfg.SetRegion(nrRegion); err != nil {
-		return &nrClient, err
+		return &nrClient, &classifiedError{class: clientErrorClassRegion, err: err}
 	}
 
 	licenseKey, err := GetLicenseKey()
+	if err != nil {
+		return &nrClient, &classifiedError{class: clientErrorClassSecret, err: err}
+	}
 	cfg.LicenseKey = licenseKey
 	nrClient = logging.New(cfg)
-	return &nrClient, err
+	return &nrClient, nil
 }
