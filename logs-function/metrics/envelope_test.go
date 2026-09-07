@@ -14,13 +14,39 @@ func TestExtractEnvelope(t *testing.T) {
 		expected Envelope
 	}{
 		{
-			name: "valid RFC3339 time",
+			name: "prefers oracle.ingestedtime over source time",
+			record: map[string]interface{}{
+				"time": "2023-01-01T12:00:00Z",
+				"oracle": map[string]interface{}{
+					"ingestedtime": "2023-01-01T12:00:05Z",
+				},
+			},
+			expected: Envelope{
+				LagTime:    time.Date(2023, 1, 1, 12, 0, 5, 0, time.UTC),
+				HasLagTime: true,
+			},
+		},
+		{
+			name: "falls back to source time when ingestedtime absent",
 			record: map[string]interface{}{
 				"time": "2023-01-01T12:00:00Z",
 			},
 			expected: Envelope{
-				Time:    time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
-				HasTime: true,
+				LagTime:    time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
+				HasLagTime: true,
+			},
+		},
+		{
+			name: "falls back to source time when ingestedtime malformed",
+			record: map[string]interface{}{
+				"time": "2023-01-01T12:00:00Z",
+				"oracle": map[string]interface{}{
+					"ingestedtime": "not-a-time",
+				},
+			},
+			expected: Envelope{
+				LagTime:    time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
+				HasLagTime: true,
 			},
 		},
 		{

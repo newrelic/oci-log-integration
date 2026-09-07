@@ -36,8 +36,19 @@ func splitLogsIntoBatches(logs common.OCILoggingEvent, maxPayloadSize int, commo
 	currentBatchSize := 0
 
 	for _, logData := range logs {
-		if env := metrics.ExtractEnvelope(logData); env.HasTime {
-			rec.Summary(metrics.TierBasic, "forwarder.pipeline.lag", time.Since(env.Time).Seconds(), nil)
+		if env := metrics.ExtractEnvelope(logData); env.HasLagTime {
+			lag := time.Since(env.LagTime).Seconds()
+			// Lag is anchored on OCI's ingestion time (see ExtractEnvelope), so it should be
+			// non-negative. A negative value can still occur on the source-time fallback path
+			// (a source clock ahead of the forwarder host) or from residual clock skew, and is
+			// not physically meaningful as pipeline latency. Clamp the latency observation to 0
+			// so it can't drag the pipeline-lag average/min negative, and count the occurrence
+			// separately so the skew stays visible instead of being silently hidden.
+			if lag < 0 {
+				rec.Count(metrics.TierBasic, "forwarder.pipeline.lag.negative", 1, nil)
+				lag = 0
+			}
+			rec.Summary(metrics.TierBasic, "forwarder.pipeline.lag", lag, nil)
 		}
 
 		logBytes, err := json.Marshal(logData)

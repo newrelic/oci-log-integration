@@ -338,3 +338,32 @@ func TestSplitLogsIntoBatches_PipelineLag(t *testing.T) {
 	names := metricstest.FlushedMetricNames(t, rec)
 	assert.True(t, names["forwarder.pipeline.lag"], "expected forwarder.pipeline.lag to be recorded")
 }
+
+// TestSplitLogsIntoBatches_NegativePipelineLag verifies that when a record's OCI Logging
+// envelope timestamp is ahead of the host clock (negative lag), the latency observation is
+// clamped to 0 and the occurrence is tracked via forwarder.pipeline.lag.negative rather than
+// emitting a physically-meaningless negative pipeline lag.
+func TestSplitLogsIntoBatches_NegativePipelineLag(t *testing.T) {
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierBasic))
+	defer os.Unsetenv(common.MetricsTier)
+
+	rec := metrics.NewRecorder(nil)
+	channel := make(chan common.DetailedLogsBatch, 10)
+
+	logs := common.OCILoggingEvent{
+		map[string]interface{}{
+			// Timestamp in the future relative to the host clock -> negative lag.
+			"time":    time.Now().Add(5 * time.Minute).UTC().Format(time.RFC3339),
+			"message": "hi",
+		},
+	}
+
+	splitLogsIntoBatches(logs, 1000, common.LogAttributes{}, channel, rec)
+	close(channel)
+	for range channel {
+	}
+
+	names := metricstest.FlushedMetricNames(t, rec)
+	assert.True(t, names["forwarder.pipeline.lag"], "expected forwarder.pipeline.lag to still be recorded (clamped to 0)")
+	assert.True(t, names["forwarder.pipeline.lag.negative"], "expected forwarder.pipeline.lag.negative to be recorded for negative lag")
+}
