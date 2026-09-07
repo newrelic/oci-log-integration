@@ -4,6 +4,7 @@ package util
 
 import (
 	"context"
+	"errors"
 	"os"
 	"sync"
 	"testing"
@@ -361,4 +362,47 @@ func TestNewNRClient_RecordsCacheHitMiss(t *testing.T) {
 
 	names := metricstest.FlushedMetricNames(t, rec)
 	assert.True(t, names["forwarder.client.cache"])
+}
+
+// TestNewNRClient_ErrorNotCachedForFullTTL verifies a failed NewNRClient result is retried
+// after the short negative-cache TTL rather than being replayed for the full CLIENT_TTL.
+func TestNewNRClient_ErrorNotCachedForFullTTL(t *testing.T) {
+	resetNRClient()
+	assert.NoError(t, os.Setenv(common.ClientTTL, "1"))
+	assert.NoError(t, os.Setenv(common.NewRelicRegion, "us"))
+	defer os.Unsetenv(common.ClientTTL)
+	defer os.Unsetenv(common.NewRelicRegion)
+
+	_, err := NewNRClient(nil)
+	assert.Error(t, err, "expected a Vault/license-key fetch failure outside a real OCI environment")
+	firstCacheTime := clientCacheTime
+
+	time.Sleep(2 * time.Second)
+
+	_, _ = NewNRClient(nil)
+	assert.True(t, clientCacheTime.After(firstCacheTime), "a cached failure should be retried well within CLIENT_TTL")
+}
+
+// TestNRClientErrorClass verifies NewNRClient failures are classified by actual cause
+// (region misconfig vs. secret/license-key fetch failure) rather than lumped into one
+// bucket, so callers can label observability metrics accurately.
+func TestNRClientErrorClass(t *testing.T) {
+	assert.Equal(t, "unknown", NRClientErrorClass(nil))
+	assert.Equal(t, "unknown", NRClientErrorClass(errors.New("some unrelated error")))
+	assert.Equal(t, "region_config", NRClientErrorClass(&classifiedError{class: clientErrorClassRegion, err: errors.New("bad region")}))
+	assert.Equal(t, "secret_fetch", NRClientErrorClass(&classifiedError{class: clientErrorClassSecret, err: errors.New("vault error")}))
+}
+
+// TestCreateNRClient_ClassifiesSecretFetchFailure verifies a GetLicenseKey failure (the only
+// createNRClient failure mode reachable outside a real OCI environment, since region.Get
+// falls back rather than erroring) is classified as secret_fetch.
+func TestCreateNRClient_ClassifiesSecretFetchFailure(t *testing.T) {
+	resetLicenseKeyCache()
+	assert.NoError(t, os.Setenv(common.NewRelicRegion, "us"))
+	defer os.Unsetenv(common.NewRelicRegion)
+
+	_, err := createNRClient()
+
+	assert.Error(t, err)
+	assert.Equal(t, "secret_fetch", NRClientErrorClass(err))
 }

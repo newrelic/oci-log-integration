@@ -46,6 +46,9 @@ func splitLogsIntoBatches(ctx context.Context, logs common.OCILoggingEvent, maxP
 		logBytes, err := json.Marshal(logData)
 		if err != nil {
 			rec.Count(metrics.TierAdvanced, "forwarder.serialize.errors", 1, nil)
+			// Also counted as dropped -- otherwise it vanishes from loss accounting entirely,
+			// and received == delivered + dropped no longer reconciles.
+			rec.Count(metrics.TierBasic, "forwarder.records.dropped", 1, map[string]interface{}{"reason": "serialize_error"})
 			log.Warnf("Warning: Could not marshal detailed log for size estimation: %v", err)
 			continue
 		}
@@ -63,14 +66,10 @@ func splitLogsIntoBatches(ctx context.Context, logs common.OCILoggingEvent, maxP
 		if len(currentBatch) == 0 {
 			currentBatch = common.LogData{logData}
 			currentBatchSize = logSize
-		} else if currentBatchSize+logSize > maxPayloadSize && len(currentBatch) > 0 {
-			if !produceBatch(ctx, channel, currentBatch, commonAttributes, currentBatchSize, rec) {
-				// Everything from here on (this record onward) never made it into a batch at
-				// all, so it needs its own drop accounting on top of what produceBatch already
-				// recorded for the batch it failed to send.
-				remaining := len(logs) - i
-				rec.Count(metrics.TierBasic, "forwarder.records.dropped", float64(remaining), map[string]interface{}{"reason": "producer_cancelled"})
-				log.Warnf("context cancelled while producing log batch; dropping %d remaining log record(s)", remaining)
+		} else if currentBatchSize+logSize > maxPayloadSize {
+			// logs[i:] (this record onward) hasn't been batched yet; produceBatch accounts for
+			// it as dropped too if the handoff below fails, alongside the batch it couldn't send.
+			if !produceBatch(ctx, channel, currentBatch, commonAttributes, currentBatchSize, len(logs)-i, rec) {
 				return
 			}
 			currentBatch = common.LogData{logData}
@@ -82,18 +81,24 @@ func splitLogsIntoBatches(ctx context.Context, logs common.OCILoggingEvent, maxP
 	}
 
 	if len(currentBatch) > 0 {
-		produceBatch(ctx, channel, currentBatch, commonAttributes, currentBatchSize, rec)
+		produceBatch(ctx, channel, currentBatch, commonAttributes, currentBatchSize, 0, rec)
 	}
 }
 
 // produceBatch sends a completed batch to the channel and records its advanced-tier batching
 // metrics. It returns false if ctx is cancelled before the batch could be handed off -- e.g. all
-// consumer workers are stuck on a slow New Relic API call and the channel buffer is full --
-// recording the batch's records as dropped instead of blocking forever.
-func produceBatch(ctx context.Context, channel chan util.BatchMessage, batch common.LogData, commonAttributes common.LogAttributes, batchSize int, rec *metrics.Recorder) bool {
+// consumer workers are stuck on a slow New Relic API call and the channel buffer is full.
+//
+// extraUnbatched is the count of records not yet assigned to any batch (the remainder of the
+// current invocation's input) that are dropped alongside batch if the handoff fails. This is
+// the single place forwarder.records.dropped gets recorded for a producer-cancelled batch --
+// deliberately, so a future second caller of produceBatch can't split the accounting between
+// here and itself and silently under-count (as a caller-side "return false" naturally invites).
+func produceBatch(ctx context.Context, channel chan util.BatchMessage, batch common.LogData, commonAttributes common.LogAttributes, batchSize int, extraUnbatched int, rec *metrics.Recorder) bool {
 	if !util.ProduceMessageToChannel(ctx, channel, batch, commonAttributes, batchSize) {
-		rec.Count(metrics.TierBasic, "forwarder.records.dropped", float64(len(batch)), map[string]interface{}{"reason": "producer_cancelled"})
-		log.Warnf("context cancelled while producing log batch; dropped %d log record(s)", len(batch))
+		dropped := len(batch) + extraUnbatched
+		rec.Count(metrics.TierBasic, "forwarder.records.dropped", float64(dropped), map[string]interface{}{"reason": "producer_cancelled"})
+		log.Warnf("context cancelled while producing log batch; dropped %d log record(s)", dropped)
 		return false
 	}
 

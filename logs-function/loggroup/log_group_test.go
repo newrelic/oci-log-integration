@@ -415,7 +415,9 @@ func TestSplitLogsIntoBatches_RecordsOversized_NotFirstInStream(t *testing.T) {
 }
 
 // TestSplitLogsIntoBatches_SerializeErrors verifies forwarder.serialize.errors fires when
-// a log record can't be marshaled for size estimation.
+// a log record can't be marshaled for size estimation, and that the record is also counted
+// in forwarder.records.dropped -- otherwise it vanishes from loss accounting entirely, and
+// received == delivered + dropped no longer reconciles.
 func TestSplitLogsIntoBatches_SerializeErrors(t *testing.T) {
 	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierAdvanced))
 	defer os.Unsetenv(common.MetricsTier)
@@ -434,4 +436,44 @@ func TestSplitLogsIntoBatches_SerializeErrors(t *testing.T) {
 
 	names := metricstest.FlushedMetricNames(t, rec)
 	assert.True(t, names["forwarder.serialize.errors"])
+	assert.True(t, names["forwarder.records.dropped"], "a record that fails to marshal must still be counted as dropped")
+}
+
+// TestSplitLogsIntoBatches_ProducerCancelledDropsUnbatchedRemainder verifies that when
+// produceBatch is called mid-loop (because a new record forced a batch split) and the
+// handoff to the channel fails, forwarder.records.dropped accounts for the failed batch AND
+// every record that hadn't been assigned to a batch yet -- not just the batch itself. This is
+// the exact path previously split between produceBatch and its caller with no test coverage.
+func TestSplitLogsIntoBatches_ProducerCancelledDropsUnbatchedRemainder(t *testing.T) {
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierBasic))
+	defer os.Unsetenv(common.MetricsTier)
+
+	rec := metrics.NewRecorder(nil)
+	channel := make(chan util.BatchMessage) // unbuffered: the mid-loop send below can never succeed on its own
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	// maxPayloadSize=1 forces every record to start a fresh batch, so the second record
+	// triggers produceBatch mid-loop (for the first record's batch) while two more records
+	// (the third and fourth) are still unbatched.
+	logs := common.OCILoggingEvent{
+		map[string]interface{}{"message": "one"},
+		map[string]interface{}{"message": "two"},
+		map[string]interface{}{"message": "three"},
+		map[string]interface{}{"message": "four"},
+	}
+
+	splitLogsIntoBatches(ctx, logs, 1, common.LogAttributes{}, channel, rec)
+
+	payload := metricstest.FlushedPayload(t, rec)
+	metricsList := payload[0]["metrics"].([]map[string]interface{})
+
+	var dropped float64
+	for _, m := range metricsList {
+		if m["name"] == "forwarder.records.dropped" {
+			dropped = m["value"].(float64)
+		}
+	}
+	assert.Equal(t, float64(len(logs)), dropped, "all 4 records (the failed batch plus the unbatched remainder) must be counted as dropped")
 }
