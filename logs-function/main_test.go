@@ -185,34 +185,9 @@ func TestHandleFunctionErrorCases(t *testing.T) {
 	}
 }
 
-// TestResourceNameEnrichmentEnabled tests the helper that gates the whole enrichment feature,
-// matching this codebase's existing DEBUG_ENABLED convention (logger.WithDebugLevel,
-// createNRClient): unset or anything other than the exact literal "true" means disabled.
+// TestResourceNameEnrichmentEnabled asserts the enrichment feature is unconditionally on.
 func TestResourceNameEnrichmentEnabled(t *testing.T) {
-	tests := []struct {
-		name     string
-		envValue string
-		unset    bool
-		want     bool
-	}{
-		{name: "unset defaults to disabled", unset: true, want: false},
-		{name: "true enables it", envValue: "true", want: true},
-		{name: "wrong case does not enable it", envValue: "TRUE", want: false},
-		{name: "false stays disabled", envValue: "false", want: false},
-		{name: "an arbitrary non-true value stays disabled", envValue: "1", want: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.unset {
-				os.Unsetenv(common.ResourceNameEnrichmentEnabled)
-			} else {
-				os.Setenv(common.ResourceNameEnrichmentEnabled, tt.envValue)
-				defer os.Unsetenv(common.ResourceNameEnrichmentEnabled)
-			}
-			assert.Equal(t, tt.want, resourceNameEnrichmentEnabled())
-		})
-	}
+	assert.True(t, resourceNameEnrichmentEnabled())
 }
 
 // TestHandleFunctionWithClient_EnrichmentEnabledButClientUnavailable proves the graceful-fallback

@@ -6,7 +6,6 @@ package main
 import (
 	"context"
 	"io"
-	"os"
 	"sync"
 
 	"github.com/fnproject/fdk-go"
@@ -80,10 +79,7 @@ func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nr
 }
 
 // resourceNameEnrichmentEnabled reports whether the OCID -> resource name enrichment feature is
-// turned on via RESOURCE_NAME_ENRICHMENT_ENABLED. Unset or anything other than "true" means off
-// -- in that case handleFunctionWithClient never calls util.NewResourceSearchClient or
-// resource.EnrichRecords at all, so log forwarding behaves exactly as it did before this feature
-// existed.
+// turned on. Always on for now.
 func resourceNameEnrichmentEnabled() bool {
-	return os.Getenv(common.ResourceNameEnrichmentEnabled) == "true"
+	return true
 }
