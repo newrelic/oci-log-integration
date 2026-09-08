@@ -30,6 +30,15 @@ const ClientTTL = "CLIENT_TTL"
 // DefaultClientTTL is the default TTL for the NewRelic client cache in seconds (10 minutes = 600 seconds).
 const DefaultClientTTL = 600
 
+// ResourceSearchErrorTTL is the environment variable name for how long, in seconds, a failed
+// Resource Search client creation is cached before the next call retries it. Kept shorter than
+// ClientTTL by default so a transient Resource Principal auth failure (e.g. on a cold start)
+// doesn't leave the OCID -> name enrichment feature dark for the full success TTL window.
+const ResourceSearchErrorTTL = "RESOURCE_SEARCH_ERROR_TTL"
+
+// DefaultResourceSearchErrorTTL is the default for ResourceSearchErrorTTL, in seconds (30 seconds).
+const DefaultResourceSearchErrorTTL = 30
+
 // MaxPayloadSize is the maximum size of a payload.
 // Reference: https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/#limits
 const MaxPayloadSize = 1 * 1024 * 1024 // 1 mb

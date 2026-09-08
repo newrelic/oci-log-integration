@@ -6,6 +6,8 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -32,18 +34,19 @@ var (
 	resourceSearchClientCache time.Time
 )
 
-// NewResourceSearchClient returns a TTL-cached (shares CLIENT_TTL/getClientTTL with
-// NewNRClient) OCI Resource Search client, authenticated via Resource Principal -- the same
-// mechanism this package already uses for its Secrets client (secrets_util.go), so this feature
-// needs no new customer credential flow. Caches on cachedAt being non-zero rather than the
-// client being non-nil, deliberately: createResourceSearchClient's two error paths both return a
-// real nil, so a nil-pointer check here would never actually cache a failure and would retry on
-// every single call.
+// NewResourceSearchClient returns a TTL-cached OCI Resource Search client, authenticated via
+// Resource Principal -- the same mechanism this package already uses for its Secrets client
+// (secrets_util.go), so this feature needs no new customer credential flow. A cached success is
+// kept for getClientTTL (shared with NewNRClient); a cached failure is kept for the much shorter
+// getResourceSearchErrorTTL, see resourceSearchCacheTTL. Caches on cachedAt being non-zero rather
+// than the client being non-nil, deliberately: createResourceSearchClient's two error paths both
+// return a real nil, so a nil-pointer check here would never actually cache a failure and would
+// retry on every single call.
 func NewResourceSearchClient() (ResourceSearchAPI, error) {
 	resourceSearchClientMu.Lock()
 	defer resourceSearchClientMu.Unlock()
 
-	if !resourceSearchClientCache.IsZero() && time.Since(resourceSearchClientCache) < getClientTTL() {
+	if !resourceSearchClientCache.IsZero() && time.Since(resourceSearchClientCache) < resourceSearchCacheTTL(cachedResourceSearchErr) {
 		return cachedResourceSearchAPI, cachedResourceSearchErr
 	}
 
@@ -51,6 +54,32 @@ func NewResourceSearchClient() (ResourceSearchAPI, error) {
 	resourceSearchClientCache = time.Now()
 
 	return cachedResourceSearchAPI, cachedResourceSearchErr
+}
+
+// resourceSearchCacheTTL returns how long a cached NewResourceSearchClient result should be
+// reused: the normal getClientTTL (shared with NewNRClient) for a cached success, or the much
+// shorter getResourceSearchErrorTTL for a cached failure -- so a transient Resource Principal
+// auth blip on cold start is retried quickly instead of leaving enrichment dark for the full
+// success TTL window.
+func resourceSearchCacheTTL(cachedErr error) time.Duration {
+	if cachedErr != nil {
+		return getResourceSearchErrorTTL()
+	}
+	return getClientTTL()
+}
+
+// getResourceSearchErrorTTL returns the TTL for a cached failed resource search client creation,
+// from environment variable or default. Mirrors getClientTTL's env-parsing shape.
+func getResourceSearchErrorTTL() time.Duration {
+	ttlSeconds := common.DefaultResourceSearchErrorTTL
+
+	if envTTL := os.Getenv(common.ResourceSearchErrorTTL); envTTL != "" {
+		if parsedTTL, err := strconv.Atoi(envTTL); err == nil && parsedTTL > 0 {
+			ttlSeconds = parsedTTL
+		}
+	}
+
+	return time.Duration(ttlSeconds) * time.Second
 }
 
 func createResourceSearchClient() (ResourceSearchAPI, error) {

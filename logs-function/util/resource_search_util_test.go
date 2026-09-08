@@ -16,6 +16,7 @@ import (
 
 	"github.com/newrelic/oci-log-integration/logs-function/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // fakeServiceError satisfies OCI SDK's common.ServiceError interface (structurally -- Go
@@ -269,12 +270,14 @@ func resetResourceSearchClientCache() {
 // TestNewResourceSearchClient_CacheExpiration mirrors TestNewNRClient_CacheExpiration's intent:
 // no real OCI credentials are available in a test environment, so createResourceSearchClient()
 // deterministically fails here -- the point is verifying the cache mechanism itself (a failure
-// gets cached and reused just like a success would, per this file's own doc comment on why the
-// cache checks cachedAt.IsZero() rather than a nil client), not whether auth succeeds.
+// gets cached and reused, per this file's own doc comment on why the cache checks
+// cachedAt.IsZero() rather than a nil client), not whether auth succeeds. Since this always
+// exercises the failure path, it sets ResourceSearchErrorTTL (the TTL actually applied to a
+// cached error), not ClientTTL.
 func TestNewResourceSearchClient_CacheExpiration(t *testing.T) {
 	resetResourceSearchClientCache()
-	os.Setenv(common.ClientTTL, "1")
-	defer os.Unsetenv(common.ClientTTL)
+	os.Setenv(common.ResourceSearchErrorTTL, "1")
+	defer os.Unsetenv(common.ResourceSearchErrorTTL)
 
 	_, firstErr := NewResourceSearchClient()
 	assert.Error(t, firstErr, "no OCI credentials in a test environment, so this should fail deterministically")
@@ -292,4 +295,45 @@ func TestNewResourceSearchClient_CacheExpiration(t *testing.T) {
 
 	_, _ = NewResourceSearchClient()
 	assert.True(t, resourceSearchClientCache.After(firstCachedAt), "a call after TTL expiration should rebuild and re-cache")
+}
+
+// TestGetResourceSearchErrorTTL mirrors TestGetClientTTL's cases for the error-specific TTL.
+func TestGetResourceSearchErrorTTL(t *testing.T) {
+	tests := []struct {
+		name        string
+		envValue    string
+		expectedTTL time.Duration
+	}{
+		{name: "Default TTL when no env var", envValue: "", expectedTTL: 30 * time.Second},
+		{name: "Custom TTL from env var", envValue: "10", expectedTTL: 10 * time.Second},
+		{name: "Invalid TTL falls back to default", envValue: "invalid", expectedTTL: 30 * time.Second},
+		{name: "Zero TTL falls back to default", envValue: "0", expectedTTL: 30 * time.Second},
+		{name: "Negative TTL falls back to default", envValue: "-5", expectedTTL: 30 * time.Second},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envValue != "" {
+				require.NoError(t, os.Setenv(common.ResourceSearchErrorTTL, tt.envValue))
+				defer func() { require.NoError(t, os.Unsetenv(common.ResourceSearchErrorTTL)) }()
+			} else {
+				require.NoError(t, os.Unsetenv(common.ResourceSearchErrorTTL))
+			}
+
+			assert.Equal(t, tt.expectedTTL, getResourceSearchErrorTTL())
+		})
+	}
+}
+
+// TestResourceSearchCacheTTL verifies a cached failure and a cached success are given different
+// TTLs -- the fix for the review comment that a transiently-cached auth failure shouldn't be
+// stuck for the same window as a healthy cached client.
+func TestResourceSearchCacheTTL(t *testing.T) {
+	os.Setenv(common.ClientTTL, "600")
+	defer os.Unsetenv(common.ClientTTL)
+	os.Setenv(common.ResourceSearchErrorTTL, "30")
+	defer os.Unsetenv(common.ResourceSearchErrorTTL)
+
+	assert.Equal(t, 600*time.Second, resourceSearchCacheTTL(nil), "a cached success should use the normal client TTL")
+	assert.Equal(t, 30*time.Second, resourceSearchCacheTTL(errors.New("boom")), "a cached failure should use the shorter error TTL")
 }

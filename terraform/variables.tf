@@ -60,9 +60,3 @@ variable "image_version" {
   description = "The version of the Docker image for the New Relic function for the region."
   default     = "latest"
 }
-
-variable "resource_name_enrichment_enabled" {
-  type        = bool
-  description = "Enable OCID-to-resource-name enrichment for forwarded logs."
-  default     = false
-}

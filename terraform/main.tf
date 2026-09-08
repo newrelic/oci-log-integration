@@ -19,12 +19,11 @@ provider "oci" {
 resource "oci_functions_application" "logging_function_app" {
   compartment_id = local.compartment_ocid
   config = {
-    "VAULT_REGION"                     = var.region
-    "DEBUG_ENABLED"                    = var.debug_enabled
-    "SECRET_OCID"                      = local.ingest_key_secret_ocid
-    "CLIENT_TTL"                       = local.client_ttl
-    "NEW_RELIC_REGION"                 = var.new_relic_region
-    "RESOURCE_NAME_ENRICHMENT_ENABLED" = var.resource_name_enrichment_enabled ? "true" : "false"
+    "VAULT_REGION"     = var.region
+    "DEBUG_ENABLED"    = var.debug_enabled
+    "SECRET_OCID"      = local.ingest_key_secret_ocid
+    "CLIENT_TTL"       = local.client_ttl
+    "NEW_RELIC_REGION" = var.new_relic_region
   }
   defined_tags               = {}
   display_name               = local.function_app_name
