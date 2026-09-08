@@ -100,6 +100,10 @@ func logMemStats(point string) {
 // the forwarded payload actually looks like against live OCI Resource Search, since the
 // function's HTTP response body is always empty. Off unless explicitly opted into, even when
 // DebugEnabled is on, since this is far more verbose than the rest of debug logging.
+//
+// This writes the customer's real OCI log content into this function's own execution logs -- a
+// second place that data now lives, not just metadata about it. Do not leave this on in
+// production; only enable it for as long as you're actively troubleshooting.
 func logTransformedPayload(records common.OCILoggingEvent) {
 	if !log.IsLevelEnabled(logrus.DebugLevel) || os.Getenv(common.LogTransformedPayloadEnabled) != "true" {
 		return

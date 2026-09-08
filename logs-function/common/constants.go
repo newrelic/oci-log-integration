@@ -80,4 +80,9 @@ const (
 // LogTransformedPayloadEnabled is the environment variable name that gates logging the full
 // post-enrichment payload as pretty-printed JSON. Off by default even when DebugEnabled is on --
 // this is a separate, explicit opt-in for a verbose diagnostic aid, not general debug logging.
+//
+// Turning this on writes the customer's real OCI log content -- the whole post-enrichment batch,
+// not just metadata -- into this function's own execution logs, which is a second place that
+// data now lives. Only turn this on for as long as you're actively troubleshooting, in a
+// non-production environment where that's acceptable; do not leave it on in production.
 const LogTransformedPayloadEnabled = "LOG_TRANSFORMED_PAYLOAD_ENABLED"
