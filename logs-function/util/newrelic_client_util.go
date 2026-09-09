@@ -50,14 +50,14 @@ func ConsumeLogBatches(ctx context.Context, channel <-chan common.DetailedLogsBa
 
 			if err != nil {
 				log.Errorf("error posting Log entry: %v", err)
-				rec.Summary(metrics.TierBasic, "forwarder.delivery.duration", duration, map[string]interface{}{"status": "error"})
-				rec.Count(metrics.TierBasic, "forwarder.records.dropped", float64(recordCount), map[string]interface{}{"reason": "delivery_error"})
+				rec.Summary(metrics.TierBasic, metrics.MetricDeliveryDuration, duration, map[string]interface{}{"status": "error"})
+				rec.Count(metrics.TierBasic, metrics.MetricRecordsDropped, float64(recordCount), map[string]interface{}{"reason": "delivery_error"})
 				// Continue processing other batches instead of terminating
 				continue
 			}
 
-			rec.Summary(metrics.TierBasic, "forwarder.delivery.duration", duration, map[string]interface{}{"status": "success"})
-			rec.Count(metrics.TierBasic, "forwarder.records.delivered", float64(recordCount), map[string]interface{}{"status": "success"})
+			rec.Summary(metrics.TierBasic, metrics.MetricDeliveryDuration, duration, map[string]interface{}{"status": "success"})
+			rec.Count(metrics.TierBasic, metrics.MetricRecordsDelivered, float64(recordCount), map[string]interface{}{"status": "success"})
 		case <-ctx.Done():
 			// Context has been cancelled, exit the goroutine
 			return

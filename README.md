@@ -11,7 +11,7 @@ This repository contains integrations to forward logs from Oracle Cloud Infrastr
 
 ## Custom forwarder metrics
 
-The log forwarder Function can emit its own `forwarder.*` custom metrics (record counts, delivery success/loss, delivery latency, pipeline lag) directly to New Relic's Metric API, in addition to forwarding logs. This is opt-in via the `metrics_tier` Terraform variable (`none` / `basic` / `advanced`; default `none`). Only the `basic` tier is implemented today; `advanced` is reserved for a follow-up.
+The log forwarder Function can emit its own `forwarder.*` custom metrics (record counts, delivery success/loss, delivery latency, pipeline lag) directly to New Relic's Metric API, in addition to forwarding logs. This is controlled via the `metrics_tier` Terraform variable (`none` / `basic` / `advanced`; default `basic`). `basic` emits the core health metrics; `advanced` adds deeper root-cause/tuning metrics (e.g. compartment, log group, and source-type dimensions) on top of everything `basic` reports. Set `metrics_tier` to `none` to disable custom metrics entirely.
 
 ## Contributing
 

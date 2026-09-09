@@ -42,3 +42,30 @@ func CurrentTier() Tier {
 func (t Tier) enabledFor(configured Tier) bool {
 	return configured != TierNone && configured >= t
 }
+
+// Metric name constants for every forwarder.* metric this package emits. Call sites pass
+// these (instead of ad hoc string literals) so MetricTiers below stays the single place
+// that documents which tier each metric belongs to.
+const (
+	MetricInvocations         = "forwarder.invocations"
+	MetricRecordsReceived     = "forwarder.records.received"
+	MetricRecordsDelivered    = "forwarder.records.delivered"
+	MetricRecordsDropped      = "forwarder.records.dropped"
+	MetricDeliveryDuration    = "forwarder.delivery.duration"
+	MetricPipelineLag         = "forwarder.pipeline.lag"
+	MetricPipelineLagNegative = "forwarder.pipeline.lag.negative"
+)
+
+// MetricTiers documents which tier each forwarder.* metric is declared at, purely for
+// visibility -- it is not consulted by Recorder.Count/Summary, which are gated by the Tier
+// argument passed at the call site. Keep this in sync with those call sites by hand; there
+// is currently no static check enforcing it.
+var MetricTiers = map[string]Tier{
+	MetricInvocations:         TierBasic,
+	MetricRecordsReceived:     TierBasic,
+	MetricRecordsDelivered:    TierBasic,
+	MetricRecordsDropped:      TierBasic,
+	MetricDeliveryDuration:    TierBasic,
+	MetricPipelineLag:         TierBasic,
+	MetricPipelineLagNegative: TierBasic,
+}

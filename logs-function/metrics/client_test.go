@@ -11,8 +11,8 @@ import (
 )
 
 func resetClientCache() {
-	clientCacheMu.Lock()
-	defer clientCacheMu.Unlock()
+	metricsClientCacheMu.Lock()
+	defer metricsClientCacheMu.Unlock()
 	cachedClient = nil
 	cachedClientErr = nil
 	clientCachedAt = time.Time{}

@@ -17,21 +17,21 @@ var log = logger.NewLogrusLogger(logger.WithDebugLevel())
 // ProcessLogs processes OCI logging events and splits them into batches for New Relic ingestion.
 // It adds instrumentation metadata to each batch and sends the batches through the provided channel.
 // The function respects payload size limits to ensure compatibility with New Relic's API constraints.
-// rec may be nil.
-func ProcessLogs(OCILoggingEvent common.OCILoggingEvent, channel chan common.DetailedLogsBatch, rec *metrics.Recorder) {
+// metricRecorder may be nil.
+func ProcessLogs(OCILoggingEvent common.OCILoggingEvent, channel chan common.DetailedLogsBatch, metricRecorder *metrics.Recorder) {
 	attributes := common.LogAttributes{
 		"instrumentation.provider": common.InstrumentationProvider,
 		"instrumentation.name":     common.InstrumentationName,
 		"instrumentation.version":  common.InstrumentationVersion,
 	}
 
-	splitLogsIntoBatches(OCILoggingEvent, common.MaxPayloadSize, attributes, channel, rec)
+	splitLogsIntoBatches(OCILoggingEvent, common.MaxPayloadSize, attributes, channel, metricRecorder)
 }
 
 // splitLogsIntoBatches splits the incoming logs into batches for processing.
 // It loosely respects (if a single log entry exceeds the maximum payload size we still try to send it)
 // the maximum payload size and sends each batch through the provided channel.
-func splitLogsIntoBatches(logs common.OCILoggingEvent, maxPayloadSize int, commonAttributes common.LogAttributes, channel chan common.DetailedLogsBatch, rec *metrics.Recorder) {
+func splitLogsIntoBatches(logs common.OCILoggingEvent, maxPayloadSize int, commonAttributes common.LogAttributes, channel chan common.DetailedLogsBatch, metricRecorder *metrics.Recorder) {
 	var currentBatch common.LogData
 	currentBatchSize := 0
 
@@ -45,10 +45,10 @@ func splitLogsIntoBatches(logs common.OCILoggingEvent, maxPayloadSize int, commo
 			// so it can't drag the pipeline-lag average/min negative, and count the occurrence
 			// separately so the skew stays visible instead of being silently hidden.
 			if lag < 0 {
-				rec.Count(metrics.TierBasic, "forwarder.pipeline.lag.negative", 1, nil)
+				metricRecorder.Count(metrics.TierBasic, metrics.MetricPipelineLagNegative, 1, nil)
 				lag = 0
 			}
-			rec.Summary(metrics.TierBasic, "forwarder.pipeline.lag", lag, nil)
+			metricRecorder.Summary(metrics.TierBasic, metrics.MetricPipelineLag, lag, nil)
 		}
 
 		logBytes, err := json.Marshal(logData)

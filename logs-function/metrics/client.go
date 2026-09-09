@@ -33,7 +33,7 @@ const requestTimeout = 5 * time.Second
 type LicenseKeyFunc func() (string, error)
 
 var (
-	clientCacheMu   sync.Mutex
+	metricsClientCacheMu   sync.Mutex
 	cachedClient    ClientAPI
 	cachedClientErr error
 	clientCachedAt  time.Time
@@ -45,8 +45,8 @@ var (
 // transient failure (bad region, license key fetch error) doesn't silently block the
 // metrics flush for the full window.
 func NewClient(getLicenseKey LicenseKeyFunc) (ClientAPI, error) {
-	clientCacheMu.Lock()
-	defer clientCacheMu.Unlock()
+	metricsClientCacheMu.Lock()
+	defer metricsClientCacheMu.Unlock()
 
 	if !clientCachedAt.IsZero() && time.Since(clientCachedAt) < cacheTTL(cachedClientErr) {
 		return cachedClient, cachedClientErr

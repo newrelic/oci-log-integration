@@ -41,7 +41,7 @@ func handleFunction(ctx context.Context, in io.Reader, out io.Writer) {
 			status = "error"
 		}
 
-		rec.Count(metrics.TierBasic, "forwarder.invocations", 1, map[string]interface{}{"status": status})
+		rec.Count(metrics.TierBasic, metrics.MetricInvocations, 1, map[string]interface{}{"status": status})
 		flushMetrics(rec)
 
 		if panicked != nil {

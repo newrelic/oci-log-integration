@@ -34,7 +34,7 @@ func (event *Event) Unmarshal(in io.Reader, rec *metrics.Recorder) error {
 	if err := json.Unmarshal(payloadBytes, &incomingLogEvent); err == nil {
 		event.EventType = OCI_LOGGING
 		event.OCILoggingEvent = incomingLogEvent
-		rec.Count(metrics.TierBasic, "forwarder.records.received", float64(len(incomingLogEvent)), nil)
+		rec.Count(metrics.TierBasic, metrics.MetricRecordsReceived, float64(len(incomingLogEvent)), nil)
 	} else {
 		log.Panicf("Error decoding incoming log events payload: %v", err)
 	}
