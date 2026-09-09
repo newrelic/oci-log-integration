@@ -70,26 +70,30 @@ const (
 
 // MetricsByTier documents which forwarder.* metrics are declared at each tier, purely for
 // visibility -- it is not consulted by Recorder.Count/Summary, which are gated by the Tier
-// argument passed at the call site. Keep this in sync with those call sites by hand; there
-// is currently no static check enforcing it.
-var MetricTiers = map[string]Tier{
-	MetricInvocations:         TierBasic,
-	MetricRecordsReceived:     TierBasic,
-	MetricRecordsDelivered:    TierBasic,
-	MetricRecordsDropped:      TierBasic,
-	MetricDeliveryDuration:    TierBasic,
-	MetricPipelineLag:         TierBasic,
-	MetricPipelineLagNegative: TierBasic,
-
-	MetricClientInitErrors: TierAdvanced,
-	MetricRunDuration:      TierAdvanced,
-	MetricDeliveryErrors:   TierAdvanced,
-	MetricBytesDelivered:   TierAdvanced,
-	MetricClientCache:      TierAdvanced,
-	MetricBytesReceived:    TierAdvanced,
-	MetricDecodeErrors:     TierAdvanced,
-	MetricSerializeErrors:  TierAdvanced,
-	MetricRecordsOversized: TierAdvanced,
-	MetricBatchesCreated:   TierAdvanced,
-	MetricBatchSizeBytes:   TierAdvanced,
+// argument passed at the call site. Keyed by Tier (rather than by metric name) so browsing
+// "what does TierBasic include" is a single lookup: MetricsByTier[TierBasic]. Keep this in
+// sync with those call sites by hand; there is currently no static check enforcing it.
+var MetricsByTier = map[Tier][]string{
+	TierBasic: {
+		MetricInvocations,
+		MetricRecordsReceived,
+		MetricRecordsDelivered,
+		MetricRecordsDropped,
+		MetricDeliveryDuration,
+		MetricPipelineLag,
+		MetricPipelineLagNegative,
+	},
+	TierAdvanced: {
+		MetricClientInitErrors,
+		MetricRunDuration,
+		MetricDeliveryErrors,
+		MetricBytesDelivered,
+		MetricClientCache,
+		MetricBytesReceived,
+		MetricDecodeErrors,
+		MetricSerializeErrors,
+		MetricRecordsOversized,
+		MetricBatchesCreated,
+		MetricBatchSizeBytes,
+	},
 }
