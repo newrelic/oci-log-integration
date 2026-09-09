@@ -44,7 +44,7 @@ func (t Tier) enabledFor(configured Tier) bool {
 }
 
 // Metric name constants for every forwarder.* metric this package emits. Call sites pass
-// these (instead of ad hoc string literals) so MetricTiers below stays the single place
+// these (instead of ad hoc string literals) so MetricsByTier below stays the single place
 // that documents which tier each metric belongs to.
 const (
 	MetricInvocations         = "forwarder.invocations"
