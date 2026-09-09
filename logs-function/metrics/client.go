@@ -33,10 +33,10 @@ const requestTimeout = 5 * time.Second
 type LicenseKeyFunc func() (string, error)
 
 var (
-	metricsClientCacheMu   sync.Mutex
-	cachedClient    ClientAPI
-	cachedClientErr error
-	clientCachedAt  time.Time
+	metricsClientCacheMu sync.Mutex
+	cachedClient         ClientAPI
+	cachedClientErr      error
+	clientCachedAt       time.Time
 )
 
 // NewClient returns a TTL-cached New Relic Metrics API client, mirroring the caching
