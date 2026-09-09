@@ -10,10 +10,12 @@ import (
 // rendering (a copy/paste artifact from whatever viewer they were captured through) and had to
 // be reconstructed as valid JSON here. Every field this package actually reads is preserved
 // verbatim from the original; irrelevant nested blocks (identity/request/response/etc.) are
-// collapsed to {} since nothing under test reads into them. Only samples whose type is actually
-// covered by a rule in rules.go are kept here -- Vault, Compute, Events ListRules, Queue, and
-// Streaming were removed since no rule touches them at all (see extract_test.go's own coverage
-// of "unmatched" behavior in general, and rules.go's own doc comment on why that's deliberate).
+// collapsed to {} since nothing under test reads into them. Samples whose type has no rule in
+// rules.go at all -- Vault, Compute, Events ListRules, Queue, and Streaming -- were removed (see
+// extract_test.go's own coverage of "unmatched" behavior in general, and rules.go's own doc
+// comment on why that's deliberate). The Bastion samples are kept specifically to prove Bastion
+// is unmatched too, now that its rule has been removed for the same "no confirmed
+// entity-definitions rule" reason.
 // parseSample is defined in extract_realsamples_test.go (same package).
 
 const sampleBastionListSessions = `{
@@ -108,10 +110,7 @@ const sampleEventsRuleExecutionLog = `{
 }`
 
 func TestExtract_RealSamples_Reconstructed(t *testing.T) {
-	const (
-		bastionOCID = "ocid1.bastion.oc1.iad.amaaaaaatvlqdbyagt36dlcwb6zdma3ddbix74hdcge5xvfnewy6heaovyjq"
-		ruleOCID    = "ocid1.eventrule.oc1.iad.amaaaaaatvlqdbyacot7p5fphd6pbcuz3zt2x7jgc4fl7xxqlrhqmoz6gjfq"
-	)
+	const ruleOCID = "ocid1.eventrule.oc1.iad.amaaaaaatvlqdbyacot7p5fphd6pbcuz3zt2x7jgc4fl7xxqlrhqmoz6gjfq"
 
 	tests := []struct {
 		name     string
@@ -119,14 +118,14 @@ func TestExtract_RealSamples_Reconstructed(t *testing.T) {
 		expected Extraction
 	}{
 		{
-			name:     "Bastion ListSessions -- matched rule but resourceId null and source empty, nothing to resolve",
+			name:     "Bastion ListSessions -- unmatched, excluded, no confirmed entity rule",
 			raw:      sampleBastionListSessions,
 			expected: Extraction{},
 		},
 		{
-			name:     "Bastion GetBastion -- matched, already has both fields via source",
+			name:     "Bastion GetBastion -- unmatched, excluded, no confirmed entity rule",
 			raw:      sampleBastionGetBastion,
-			expected: Extraction{OCID: bastionOCID, ExistingName: "demo-bastion", NeedsResolve: false},
+			expected: Extraction{},
 		},
 		{
 			name:     "Events rule-execution log -- matched, resolves via data.ruleId, source ignored (no NamePath)",

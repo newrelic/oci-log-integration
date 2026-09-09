@@ -21,11 +21,11 @@ type Rule struct {
 	// OCIDPath locates the resource's OCID.
 	OCIDPath string
 	// NamePath locates an existing display name in the payload, for a type where the name is
-	// present on some but not necessarily all records (e.g. Bastion: present on GetBastion,
-	// absent on ListSessions). Empty means this type never carries a name anywhere, so a match
-	// always requires a Resource Search lookup. Do NOT add a rule (or a NamePath) for a type
-	// whose name is *always* present -- entity synthesis reads that native field directly with
-	// zero involvement from this package, so extracting/injecting it here would be dead weight.
+	// present on some but not necessarily all records. Empty means this type never carries a
+	// name anywhere, so a match always requires a Resource Search lookup. Do NOT add a rule (or
+	// a NamePath) for a type whose name is *always* present -- entity synthesis reads that
+	// native field directly with zero involvement from this package, so extracting/injecting it
+	// here would be dead weight.
 	// This table exists only for types where synthesis has nothing to go on without us: API
 	// Gateway, Service Connector Hub, Functions, Load Balancer, Object Storage, Queue, and
 	// Streaming were all confirmed (via their real entity-synthesis rules, or explicit
@@ -40,17 +40,6 @@ type Rule struct {
 // to a new type means adding a Rule here, not relying on a generic guess that might land on the
 // wrong field, or resolve something never meant to be resolved, for a type nobody's checked.
 var rules = []Rule{
-	{
-		// VNIC flow logs, Network Load Balancer connection logs, and Load Balancer flow logs
-		// all emit the exact type com.oraclecloud.vcn.flowlogs.DataEvent, and all carry
-		// oracle.vnicocid -- the VNIC itself is what gets named here, not oracle.resourceId (the
-		// owning LB/NLB/etc.), by product decision. Prefix, not exact, so a sibling type under
-		// this same flow-logs sub-namespace (if OCI ever emits one) gets a shot at the same
-		// field rather than being silently skipped. No name anywhere in the payload for this type.
-		Type:        "com.oraclecloud.vcn.flowlogs.",
-		PrefixMatch: true,
-		OCIDPath:    "oracle.vnicocid",
-	},
 	{
 		// Exact type seen: com.oraclecloud.networkfirewall.traffic. Prefix so any sibling
 		// Network Firewall log type also gets a shot at data.firewall-id. No name anywhere in
@@ -89,19 +78,8 @@ var rules = []Rule{
 		OCIDPath:    "data.ruleId",
 	},
 	{
-		// Bastion's management calls (GetBastion) carry both fields; session-level operations
-		// (ListSessions) carry neither (data.resourceId: NULL, source: "") -- confirmed this is
-		// genuinely partial coverage, not "always populated" like the dropped types above, so
-		// this rule (and its NamePath) stays: when source is present, no resolve; when it's
-		// missing, NeedsResolve correctly becomes true and a real lookup happens.
-		Type:        "com.oraclecloud.bastion.",
-		PrefixMatch: true,
-		OCIDPath:    "data.resourceId",
-		NamePath:    "source",
-	},
-	{
-		// source duplicates the same OCID here (not a name), unlike Bastion's source -- no
-		// NamePath, this genuinely needs a Resource Search resolve.
+		// source duplicates the same OCID here (not a name) -- no NamePath, this genuinely
+		// needs a Resource Search resolve.
 		Type:        "com.oraclecloud.goldengate.",
 		PrefixMatch: true,
 		OCIDPath:    "data.resourceId",

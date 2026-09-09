@@ -235,8 +235,6 @@ func parseSample(t *testing.T, raw string) map[string]interface{} {
 
 func TestExtract_RealSamples_Clean(t *testing.T) {
 	const (
-		nlbVnicOCID  = "ocid1.vnic.oc1.iad.abuwcljrhxeeyawuc5qsdv5opaosn26o5fftjdkdcgaqjn6ka4rqc3wih3bq"
-		acceptVnic   = "ocid1.vnic.oc1.iad.abuwcljtsxsa7nu6spexecas25aw33gqufj2ljccwocl34xqcl6hhstcclta"
 		firewallOCID = "ocid1.networkfirewall.oc1.iad.amaaaaaatvlqdbya2vdgj5rqg7zw52o7qq2a5z7k6lu2ubefwf7ykqwei4xq"
 		dnsOCID      = "ocid1.dnsresolver.oc1.iad.amaaaaaatvlqdbyaf4mgekhmbsvoxvyluwzhowzpdci4rzjrgat6n7z2yj4q"
 		integOCID    = "ocid1.integrationinstance.oc1.iad.amaaaaaatvlqdbyassm3eanvviwuoijb57xkalojoiovyfuu6lslkmx7b6lq"
@@ -249,9 +247,9 @@ func TestExtract_RealSamples_Clean(t *testing.T) {
 		expected Extraction
 	}{
 		{
-			name:     "NLB Connection Log -- resolves via oracle.vnicocid",
+			name:     "NLB Connection Log (VCN flow logs) -- unmatched, excluded, no confirmed entity rule",
 			raw:      sampleNLBConnectionLog,
-			expected: Extraction{OCID: nlbVnicOCID, NeedsResolve: true},
+			expected: Extraction{},
 		},
 		{
 			name:     "Network Firewall traffic -- resolves via data.firewall-id",
@@ -259,14 +257,14 @@ func TestExtract_RealSamples_Clean(t *testing.T) {
 			expected: Extraction{OCID: firewallOCID, NeedsResolve: true},
 		},
 		{
-			name:     "VNIC ACCEPT -- resolves via oracle.vnicocid",
+			name:     "VNIC ACCEPT -- unmatched, excluded, no confirmed entity rule",
 			raw:      sampleVNICAccept,
-			expected: Extraction{OCID: acceptVnic, NeedsResolve: true},
+			expected: Extraction{},
 		},
 		{
-			name:     "VNIC REJECT -- resolves via oracle.vnicocid, SAME ocid as the NLB sample",
+			name:     "VNIC REJECT -- unmatched, excluded, no confirmed entity rule",
 			raw:      sampleVNICReject,
-			expected: Extraction{OCID: nlbVnicOCID, NeedsResolve: true},
+			expected: Extraction{},
 		},
 		{
 			name:     "DNS Private Resolver -- resolves via source",

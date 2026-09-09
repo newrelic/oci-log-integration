@@ -26,26 +26,16 @@ func (f *fakeResolver) ResolveMany(ctx context.Context, ocids []string) (map[str
 	return f.resolved, f.err
 }
 
-func vnicRecord(vnicOCID string) map[string]interface{} {
+// firewallRecord builds a record matching the still-active Network Firewall rule -- used as a
+// generic "needs resolve" fixture for EnrichRecords tests that aren't about Network Firewall
+// itself. VCN flow logs and Bastion used to serve this role, but both were dropped from rules.go
+// (no confirmed entity-definitions rule for either), so this package no longer has any way to
+// build a matched record via a real rule from those two.
+func firewallRecord(firewallOCID string) map[string]interface{} {
 	return map[string]interface{}{
 		"logContent": map[string]interface{}{
-			"type": "com.oraclecloud.vcn.flowlogs.DataEvent",
-			"oracle": map[string]interface{}{
-				"vnicocid": vnicOCID,
-			},
-			"source": "-",
-		},
-	}
-}
-
-func bastionGetBastionRecord() map[string]interface{} {
-	return map[string]interface{}{
-		"logContent": map[string]interface{}{
-			"type":   "com.oraclecloud.bastion.GetBastion",
-			"source": "demo-bastion",
-			"data": map[string]interface{}{
-				"resourceId": "ocid1.bastion.oc1.iad.amaaaaaatvlqdbyagt36dlcwb6zdma3ddbix74hdcge5xvfnewy6heaovyjq",
-			},
+			"type": "com.oraclecloud.networkfirewall.traffic",
+			"data": map[string]interface{}{"firewall-id": firewallOCID},
 		},
 	}
 }
@@ -79,37 +69,25 @@ func logContentOf(t *testing.T, rec map[string]interface{}) map[string]interface
 }
 
 func TestEnrichRecords_DedupesBeforeResolve(t *testing.T) {
-	const vnic = "ocid1.vnic.oc1.iad.abuwcljrhxeeyawuc5qsdv5opaosn26o5fftjdkdcgaqjn6ka4rqc3wih3bq"
-	records := common.OCILoggingEvent{vnicRecord(vnic), vnicRecord(vnic), vnicRecord(vnic)}
-	resolver := &fakeResolver{resolved: map[string]string{vnic: "my-nlb"}}
+	const firewallOCID = "ocid1.networkfirewall.oc1.iad.a"
+	records := common.OCILoggingEvent{firewallRecord(firewallOCID), firewallRecord(firewallOCID), firewallRecord(firewallOCID)}
+	resolver := &fakeResolver{resolved: map[string]string{firewallOCID: "prod-firewall"}}
 
 	EnrichRecords(context.Background(), records, resolver)
 
 	assert.Equal(t, 1, resolver.callCount, "ResolveMany should be called exactly once per invocation")
-	assert.Equal(t, []string{vnic}, resolver.ocidsReceived, "three records with the same OCID should dedupe to one entry")
-}
-
-func TestEnrichRecords_SkipsResolveWhenNothingNeedsIt(t *testing.T) {
-	records := common.OCILoggingEvent{bastionGetBastionRecord(), bastionGetBastionRecord()}
-	resolver := &fakeResolver{}
-
-	EnrichRecords(context.Background(), records, resolver)
-
-	assert.Zero(t, resolver.callCount, "resolver should never be called when every record already has a name")
-	for _, rec := range records {
-		assert.Equal(t, "demo-bastion", dataOf(t, rec)["logging.oci.displayName"])
-	}
+	assert.Equal(t, []string{firewallOCID}, resolver.ocidsReceived, "three records with the same OCID should dedupe to one entry")
 }
 
 func TestEnrichRecords_InjectsResolvedName(t *testing.T) {
-	const vnic = "ocid1.vnic.oc1.iad.abuwcljrhxeeyawuc5qsdv5opaosn26o5fftjdkdcgaqjn6ka4rqc3wih3bq"
-	rec := vnicRecord(vnic)
+	const firewallOCID = "ocid1.networkfirewall.oc1.iad.a"
+	rec := firewallRecord(firewallOCID)
 	records := common.OCILoggingEvent{rec}
-	resolver := &fakeResolver{resolved: map[string]string{vnic: "my-nlb"}}
+	resolver := &fakeResolver{resolved: map[string]string{firewallOCID: "prod-firewall"}}
 
 	EnrichRecords(context.Background(), records, resolver)
 
-	assert.Equal(t, "my-nlb", dataOf(t, rec)["logging.oci.displayName"])
+	assert.Equal(t, "prod-firewall", dataOf(t, rec)["logging.oci.displayName"])
 }
 
 func TestEnrichRecords_PartialResolveFailureStillInjectsWhatResolved(t *testing.T) {
@@ -142,18 +120,15 @@ func TestEnrichRecords_PartialResolveFailureStillInjectsWhatResolved(t *testing.
 	assert.NotContains(t, dataOf(t, dnsRec), "logging.oci.displayName", "unresolved OCID should not get a name")
 }
 
-func TestEnrichRecords_NilResolverStillInjectsAlreadyKnownNames(t *testing.T) {
-	const vnic = "ocid1.vnic.oc1.iad.c"
-	bastionRec := bastionGetBastionRecord()
-	vnicRec := vnicRecord(vnic)
-	records := common.OCILoggingEvent{bastionRec, vnicRec}
+func TestEnrichRecords_NilResolverNeverInjectsAName(t *testing.T) {
+	rec := firewallRecord("ocid1.networkfirewall.oc1.iad.c")
+	records := common.OCILoggingEvent{rec}
 
 	assert.NotPanics(t, func() {
 		EnrichRecords(context.Background(), records, nil)
 	})
 
-	assert.Equal(t, "demo-bastion", dataOf(t, bastionRec)["logging.oci.displayName"], "name already known from the payload, no resolver needed")
-	assert.NotContains(t, dataOf(t, vnicRec), "logging.oci.displayName", "no resolver was available, so this can't have gotten a name")
+	assert.NotContains(t, dataOf(t, rec), "logging.oci.displayName", "no resolver was available, so this can't have gotten a name")
 }
 
 func TestEnrichRecords_UnmatchedRecordGetsNoInjectionAtAll(t *testing.T) {

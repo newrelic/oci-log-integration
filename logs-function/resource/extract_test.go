@@ -9,7 +9,8 @@ import (
 // TestExtract covers every rule in rules.go against a record shaped like the real sample it was
 // built from, plus the types that are deliberately NOT in rules.go (either because they always
 // carry a name natively -- API Gateway, Queue, Streaming -- or because they're genuinely
-// unverified/excluded -- Vault, Compute list operations).
+// unverified/excluded -- Vault, Compute list operations, VCN flow logs, Bastion (no confirmed
+// entity-definitions rule for either)).
 func TestExtract(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -17,7 +18,7 @@ func TestExtract(t *testing.T) {
 		expected Extraction
 	}{
 		{
-			name: "NLB connection log resolves via oracle.vnicocid, not oracle.resourceId",
+			name: "NLB connection log (VCN flow logs) is unmatched -- excluded, no confirmed entity rule",
 			logData: map[string]interface{}{
 				"logContent": map[string]interface{}{
 					"type": "com.oraclecloud.vcn.flowlogs.DataEvent",
@@ -30,13 +31,10 @@ func TestExtract(t *testing.T) {
 					"data":   map[string]interface{}{"flowid": "66548b44"},
 				},
 			},
-			expected: Extraction{
-				OCID:         "ocid1.vnic.oc1.iad.abuwcljrhxeeyawuc5qsdv5opaosn26o5fftjdkdcgaqjn6ka4rqc3wih3bq",
-				NeedsResolve: true,
-			},
+			expected: Extraction{},
 		},
 		{
-			name: "VNIC ACCEPT flow log (loadbalancer variant) resolves the same way",
+			name: "VNIC ACCEPT flow log (loadbalancer variant) is unmatched the same way",
 			logData: map[string]interface{}{
 				"logContent": map[string]interface{}{
 					"type": "com.oraclecloud.vcn.flowlogs.DataEvent",
@@ -49,10 +47,7 @@ func TestExtract(t *testing.T) {
 					"data":   map[string]interface{}{"action": "ACCEPT"},
 				},
 			},
-			expected: Extraction{
-				OCID:         "ocid1.vnic.oc1.iad.abuwcljtsxsa7nu6spexecas25aw33gqufj2ljccwocl34xqcl6hhstcclta",
-				NeedsResolve: true,
-			},
+			expected: Extraction{},
 		},
 		{
 			name: "Network Firewall traffic log resolves via data.firewall-id",
@@ -117,7 +112,7 @@ func TestExtract(t *testing.T) {
 			},
 		},
 		{
-			name: "Bastion GetBastion already has both fields -- no resolve needed",
+			name: "Bastion GetBastion is unmatched -- excluded, no confirmed entity rule",
 			logData: map[string]interface{}{
 				"logContent": map[string]interface{}{
 					"type":   "com.oraclecloud.bastion.GetBastion",
@@ -128,14 +123,10 @@ func TestExtract(t *testing.T) {
 					},
 				},
 			},
-			expected: Extraction{
-				OCID:         "ocid1.bastion.oc1.iad.amaaaaaatvlqdbyagt36dlcwb6zdma3ddbix74hdcge5xvfnewy6heaovyjq",
-				ExistingName: "demo-bastion",
-				NeedsResolve: false,
-			},
+			expected: Extraction{},
 		},
 		{
-			name: "Bastion ListSessions has neither field -- matched rule, nothing to resolve",
+			name: "Bastion ListSessions is unmatched -- excluded, no confirmed entity rule",
 			logData: map[string]interface{}{
 				"logContent": map[string]interface{}{
 					"type":   "com.oraclecloud.bastion.ListSessions",
@@ -270,17 +261,16 @@ func TestExtract(t *testing.T) {
 			name: "matched rule but the OCID field holds a non-OCID value -- rejected, not extracted",
 			logData: map[string]interface{}{
 				"logContent": map[string]interface{}{
-					"type": "com.oraclecloud.bastion.GetBastion",
+					"type": "com.oraclecloud.goldengate.deployment.restapi_logs",
 					"data": map[string]interface{}{
 						"resourceId": "not-an-ocid",
 					},
-					"source": "demo-bastion",
+					"source": "not-an-ocid",
 				},
 			},
-			// OCID fails the ocid1. prefix check, so ends up empty; ExistingName is still found
-			// via NamePath, but NeedsResolve requires a non-empty OCID too, so it stays false --
-			// there being a name doesn't matter if we have nothing to associate it with.
-			expected: Extraction{ExistingName: "demo-bastion"},
+			// OCID fails the ocid1. prefix check, so ends up empty; no NamePath is declared for
+			// this type, so there's nothing else to fall back on either.
+			expected: Extraction{},
 		},
 	}
 

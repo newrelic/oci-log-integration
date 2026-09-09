@@ -2,7 +2,6 @@ package resource
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"runtime"
 	"strconv"
@@ -71,7 +70,7 @@ func EnrichRecords(ctx context.Context, records common.OCILoggingEvent, resolver
 		injectResourceName(rec, extractions[i].ExistingName)
 	}
 
-	logTransformedPayload(records)
+	logResolvedNames(extractions)
 
 	logMemStats("enrichment end")
 
@@ -95,25 +94,27 @@ func logMemStats(point string) {
 	}).Debug("resource name enrichment memory footprint")
 }
 
-// logTransformedPayload logs the full post-enrichment records as pretty-printed JSON, gated on
-// both common.LogTransformedPayloadEnabled and debug level -- a temporary aid for verifying what
-// the forwarded payload actually looks like against live OCI Resource Search, since the
-// function's HTTP response body is always empty. Off unless explicitly opted into, even when
-// DebugEnabled is on, since this is far more verbose than the rest of debug logging.
-//
-// This writes the customer's real OCI log content into this function's own execution logs -- a
-// second place that data now lives, not just metadata about it. Do not leave this on in
-// production; only enable it for as long as you're actively troubleshooting.
-func logTransformedPayload(records common.OCILoggingEvent) {
+// logResolvedNames logs each record's OCID and resolved name, gated on both
+// common.LogTransformedPayloadEnabled and debug level -- a lightweight aid for verifying what
+// Resource Search actually resolved, since the function's HTTP response body is always empty.
+// Off unless explicitly opted into, even when DebugEnabled is on, since this is more verbose than
+// the rest of debug logging. Deliberately logs only the OCID/name pair, not the surrounding log
+// content, so this stays safe to enable without writing the customer's real OCI log content into
+// this function's own execution logs.
+func logResolvedNames(extractions []Extraction) {
 	if !log.IsLevelEnabled(logrus.DebugLevel) || os.Getenv(common.LogTransformedPayloadEnabled) != "true" {
 		return
 	}
-	pretty, err := json.MarshalIndent(records, "", "  ")
-	if err != nil {
-		log.Warnf("failed to marshal transformed payload for logging: %v", err)
-		return
+	for i, ext := range extractions {
+		if ext.OCID == "" {
+			continue
+		}
+		name := ext.ExistingName
+		if name == "" {
+			name = "<unresolved>"
+		}
+		log.Debugf("resource name enrichment: record %d ocid=%s name=%s", i, ext.OCID, name)
 	}
-	log.Debugf("transformed payload after enrichment:\n%s", pretty)
 }
 
 // resolveTimeout bounds how long the one resolve-many call per invocation may run, via

@@ -86,12 +86,11 @@ const (
 	MaxRetryDelay  = 1500 * time.Millisecond
 )
 
-// LogTransformedPayloadEnabled is the environment variable name that gates logging the full
-// post-enrichment payload as pretty-printed JSON. Off by default even when DebugEnabled is on --
-// this is a separate, explicit opt-in for a verbose diagnostic aid, not general debug logging.
+// LogTransformedPayloadEnabled is the environment variable name that gates logging each record's
+// resolved OCID/name pair after enrichment. Off by default even when DebugEnabled is on -- this
+// is a separate, explicit opt-in for a verbose diagnostic aid, not general debug logging.
 //
-// Turning this on writes the customer's real OCI log content -- the whole post-enrichment batch,
-// not just metadata -- into this function's own execution logs, which is a second place that
-// data now lives. Only turn this on for as long as you're actively troubleshooting, in a
-// non-production environment where that's acceptable; do not leave it on in production.
+// Deliberately logs only the OCID and resolved name, not the surrounding log content, so this
+// stays safe to enable without writing the customer's real OCI log content into this function's
+// own execution logs.
 const LogTransformedPayloadEnabled = "LOG_TRANSFORMED_PAYLOAD_ENABLED"
