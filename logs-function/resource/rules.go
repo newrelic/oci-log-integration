@@ -73,7 +73,7 @@ var rules = []Rule{
 		// we don't have this type's own entity-synthesis rule to confirm source
 		// ("poc-reconciler-rule" in the one sample seen) is *always* populated, so it's treated
 		// as needing a resolve rather than assumed safe to skip.
-		Type:        "com.oraclecloud.eventsservice.eventrule.",
+		Type:        "com.oraclecloud.EventsService.",
 		PrefixMatch: true,
 		OCIDPath:    "data.ruleId",
 	},
