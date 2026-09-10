@@ -94,15 +94,15 @@ func logMemStats(point string) {
 	}).Debug("resource name enrichment memory footprint")
 }
 
-// logResolvedNames logs each record's OCID and resolved name, gated on both
-// common.LogTransformedPayloadEnabled and debug level -- a lightweight aid for verifying what
-// Resource Search actually resolved, since the function's HTTP response body is always empty.
-// Off unless explicitly opted into, even when DebugEnabled is on, since this is more verbose than
-// the rest of debug logging. Deliberately logs only the OCID/name pair, not the surrounding log
-// content, so this stays safe to enable without writing the customer's real OCI log content into
-// this function's own execution logs.
+// logResolvedNames logs each record's OCID and resolved name at debug level -- a lightweight aid
+// for verifying what Resource Search actually resolved, since the function's HTTP response body
+// is always empty. One line per record, so this needs no separate opt-in beyond DebugEnabled --
+// unlike a full-payload dump, it's cheap enough to always emit alongside the rest of debug
+// logging. Deliberately logs only the OCID/name pair, not the surrounding log content, so this
+// stays safe to enable without writing the customer's real OCI log content into this function's
+// own execution logs.
 func logResolvedNames(extractions []Extraction) {
-	if !log.IsLevelEnabled(logrus.DebugLevel) || os.Getenv(common.LogTransformedPayloadEnabled) != "true" {
+	if !log.IsLevelEnabled(logrus.DebugLevel) {
 		return
 	}
 	for i, ext := range extractions {
