@@ -1,6 +1,8 @@
 // Package common provides common constants structs and variables.
 package common
 
+import "time"
+
 // InstrumentationProvider is a parameter necessary for Entity Synthesis at New Relic.
 const InstrumentationProvider = "oci"
 
@@ -28,6 +30,15 @@ const ClientTTL = "CLIENT_TTL"
 // DefaultClientTTL is the default TTL for the NewRelic client cache in seconds (10 minutes = 600 seconds).
 const DefaultClientTTL = 600
 
+// ResourceSearchErrorTTL is the environment variable name for how long, in seconds, a failed
+// Resource Search client creation is cached before the next call retries it. Kept shorter than
+// ClientTTL by default so a transient Resource Principal auth failure (e.g. on a cold start)
+// doesn't leave the OCID -> name enrichment feature dark for the full success TTL window.
+const ResourceSearchErrorTTL = "RESOURCE_SEARCH_ERROR_TTL"
+
+// DefaultResourceSearchErrorTTL is the default for ResourceSearchErrorTTL, in seconds (30 seconds).
+const DefaultResourceSearchErrorTTL = 30
+
 // MaxPayloadSize is the maximum size of a payload.
 // Reference: https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/#limits
 const MaxPayloadSize = 1 * 1024 * 1024 // 1 mb
@@ -37,3 +48,35 @@ const LicenseKey = "licenseKey"
 
 // Message channel size
 const MessageChannelSize = 10
+
+// MaxIdentifiersPerQuery is OCI Resource Search's hard count limit on the number of values
+// allowed in an "identifier in (...)" structured-query clause. Verified empirically: a 20-item
+// list succeeds, a 21-item list fails with CannotParseRequest at nearly the same query length,
+// confirming this is a genuine count limit, not the separate (much larger) 50,000-character
+// total-query-length cap.
+const MaxIdentifiersPerQuery = 20
+
+// ResourceSearchWorkerPool bounds how many chunked Resource Search calls run concurrently
+// when resolving a batch's distinct missing-name OCIDs.
+const ResourceSearchWorkerPool = 5
+
+// ResourceResolveTimeoutSeconds is the environment variable name for how long, in seconds, a
+// single invocation's resolve-many phase may run before it's abandoned in favor of shipping
+// logs without a resolved name rather than blocking forwarding.
+const ResourceResolveTimeoutSeconds = "RESOURCE_RESOLVE_TIMEOUT_SECONDS"
+
+// DefaultResourceResolveTimeoutSeconds is the default for ResourceResolveTimeoutSeconds.
+const DefaultResourceResolveTimeoutSeconds = 10
+
+// MaxSearchRetries is how many extra attempts a single Resource Search chunk gets after a
+// retriable (429/5xx) failure, before giving up and letting that chunk's OCIDs ship without a
+// name.
+const MaxSearchRetries = 3
+
+// BaseRetryDelay and MaxRetryDelay bound the exponential-backoff-with-full-jitter delay between
+// Resource Search retry attempts: a random duration between 0 and
+// min(MaxRetryDelay, BaseRetryDelay * 2^attempt).
+const (
+	BaseRetryDelay = 100 * time.Millisecond
+	MaxRetryDelay  = 1500 * time.Millisecond
+)

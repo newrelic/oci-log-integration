@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/newrelic/oci-log-integration/logs-function/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -181,4 +182,42 @@ func TestHandleFunctionErrorCases(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestResourceNameEnrichmentEnabled asserts the enrichment feature is unconditionally on.
+func TestResourceNameEnrichmentEnabled(t *testing.T) {
+	assert.True(t, resourceNameEnrichmentEnabled())
+}
+
+// TestHandleFunctionWithClient_EnrichmentEnabledButClientUnavailable proves the graceful-fallback
+// path: util.NewResourceSearchClient() fails deterministically in this test environment (no real
+// OCI Resource Principal credentials available -- same situation
+// util.TestNewResourceSearchClient_CacheExpiration already relies on), and log forwarding must
+// still succeed, with the original record unenriched, rather than blocking or panicking.
+func TestHandleFunctionWithClient_EnrichmentEnabledButClientUnavailable(t *testing.T) {
+	mockClient := new(MockNewRelicClient)
+	mockClient.On("CreateLogEntry", mock.MatchedBy(func(batch interface{}) bool {
+		detailedBatch, ok := batch.(common.DetailedLogsBatch)
+		if !ok || len(detailedBatch) == 0 || len(detailedBatch[0].Entries) == 0 {
+			return false
+		}
+		data, _ := detailedBatch[0].Entries[0]["data"].(map[string]interface{})
+		_, hasInjectedName := data["logging.oci.displayName"]
+		return !hasInjectedName // the client failed, so enrichment must not have run at all
+	})).Return(nil).Once()
+
+	input := bytes.NewReader([]byte(`[{
+		"type": "com.oraclecloud.networkfirewall.traffic",
+		"source": "ocid1.networkfirewall.oc1.iad.abuwcljrhxeeyawuc5qsdv5opaosn26o5fftjdkdcgaqjn6ka4rqc3wih3bq",
+		"data": {"firewall-id": "ocid1.networkfirewall.oc1.iad.abuwcljrhxeeyawuc5qsdv5opaosn26o5fftjdkdcgaqjn6ka4rqc3wih3bq"}
+	}]`))
+	output := &bytes.Buffer{}
+	ctx := context.Background()
+
+	assert.NotPanics(t, func() {
+		handleFunctionWithClient(ctx, input, output, mockClient)
+		time.Sleep(100 * time.Millisecond)
+	}, "a resource search client failure must not block log forwarding")
+
+	mockClient.AssertExpectations(t)
 }
