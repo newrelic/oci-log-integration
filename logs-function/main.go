@@ -45,7 +45,7 @@ func handleFunction(ctx context.Context, in io.Reader, out io.Writer) {
 			status = "error"
 		}
 
-		rec.Count(metrics.TierBasic, metrics.MetricInvocations, 1, map[string]interface{}{"status": status})
+		rec.Count(metrics.Basic.MetricInvocations, 1, map[string]interface{}{"status": status})
 		flushMetrics(rec)
 
 		if panicked != nil {
@@ -59,7 +59,7 @@ func handleFunction(ctx context.Context, in io.Reader, out io.Writer) {
 	// Registered second (after the flush defer above) so it runs first, before the flush.
 	runStart := time.Now()
 	defer func() {
-		rec.Summary(metrics.TierAdvanced, metrics.MetricRunDuration, time.Since(runStart).Seconds(), nil)
+		rec.Summary(metrics.Advanced.MetricRunDuration, time.Since(runStart).Seconds(), nil)
 	}()
 
 	// Create NewRelic client during function invocation, not startup
@@ -67,7 +67,7 @@ func handleFunction(ctx context.Context, in io.Reader, out io.Writer) {
 	if err != nil {
 		// Named/tagged by actual cause (region misconfig vs. Vault/license-key fetch failure)
 		// rather than assuming every NewNRClient failure is a secret-fetch problem.
-		rec.Count(metrics.TierAdvanced, metrics.MetricClientInitErrors, 1, map[string]interface{}{"error_class": util.NRClientErrorClass(err)})
+		rec.Count(metrics.Advanced.MetricClientInitErrors, 1, map[string]interface{}{"error_class": util.NRClientErrorClass(err)})
 		log.Panicf("error initializing newrelic client: %v", err)
 	}
 

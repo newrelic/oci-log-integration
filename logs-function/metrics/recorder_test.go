@@ -34,8 +34,8 @@ func TestRecorder_NilSafe(t *testing.T) {
 	var r *Recorder
 
 	assert.NotPanics(t, func() {
-		r.Count(TierBasic, "forwarder.invocations", 1, nil)
-		r.Summary(TierBasic, "forwarder.pipeline.lag", 1.5, nil)
+		r.Count(Metric{Name: "forwarder.invocations", tier: TierBasic}, 1, nil)
+		r.Summary(Metric{Name: "forwarder.pipeline.lag", tier: TierBasic}, 1.5, nil)
 		r.SetDimension("compartment", "prod")
 		err := r.Flush(&mockClient{})
 		assert.NoError(t, err)
@@ -47,8 +47,8 @@ func TestRecorder_CountGatedByTier(t *testing.T) {
 	setTier(t, common.MetricsTierBasic)
 	r := NewRecorder(nil)
 
-	r.Count(TierBasic, "forwarder.invocations", 1, map[string]interface{}{"status": "success"})
-	r.Count(TierAdvanced, "forwarder.bytes.received", 100, nil) // should be dropped, above configured tier
+	r.Count(Metric{Name: "forwarder.invocations", tier: TierBasic}, 1, map[string]interface{}{"status": "success"})
+	r.Count(Metric{Name: "forwarder.bytes.received", tier: TierAdvanced}, 100, nil) // should be dropped, above configured tier
 
 	assert.Len(t, r.counts, 1)
 	assert.Len(t, r.summaries, 0)
@@ -59,8 +59,8 @@ func TestRecorder_CountAccumulates(t *testing.T) {
 	r := NewRecorder(nil)
 
 	attrs := map[string]interface{}{"status": "success"}
-	r.Count(TierBasic, "forwarder.records.delivered", 5, attrs)
-	r.Count(TierBasic, "forwarder.records.delivered", 3, attrs)
+	r.Count(Metric{Name: "forwarder.records.delivered", tier: TierBasic}, 5, attrs)
+	r.Count(Metric{Name: "forwarder.records.delivered", tier: TierBasic}, 3, attrs)
 
 	key := metricKey("forwarder.records.delivered", attrs)
 	assert.Equal(t, float64(8), r.counts[key].value)
@@ -70,9 +70,9 @@ func TestRecorder_SummaryAggregates(t *testing.T) {
 	setTier(t, common.MetricsTierBasic)
 	r := NewRecorder(nil)
 
-	r.Summary(TierBasic, "forwarder.delivery.duration", 1.0, nil)
-	r.Summary(TierBasic, "forwarder.delivery.duration", 3.0, nil)
-	r.Summary(TierBasic, "forwarder.delivery.duration", 2.0, nil)
+	r.Summary(Metric{Name: "forwarder.delivery.duration", tier: TierBasic}, 1.0, nil)
+	r.Summary(Metric{Name: "forwarder.delivery.duration", tier: TierBasic}, 3.0, nil)
+	r.Summary(Metric{Name: "forwarder.delivery.duration", tier: TierBasic}, 2.0, nil)
 
 	key := metricKey("forwarder.delivery.duration", nil)
 	p := r.summaries[key]
@@ -85,7 +85,7 @@ func TestRecorder_SummaryAggregates(t *testing.T) {
 func TestRecorder_FlushNoopWhenTierNone(t *testing.T) {
 	setTier(t, common.MetricsTierNone)
 	r := NewRecorder(nil)
-	r.Count(TierBasic, "forwarder.invocations", 1, nil)
+	r.Count(Metric{Name: "forwarder.invocations", tier: TierBasic}, 1, nil)
 
 	client := &mockClient{}
 	err := r.Flush(client)
@@ -108,8 +108,8 @@ func TestRecorder_FlushNoopWhenEmpty(t *testing.T) {
 func TestRecorder_FlushSendsPayload(t *testing.T) {
 	setTier(t, common.MetricsTierBasic)
 	r := NewRecorder(map[string]interface{}{"cloud": "oci"})
-	r.Count(TierBasic, "forwarder.invocations", 1, map[string]interface{}{"status": "success"})
-	r.Summary(TierBasic, "forwarder.delivery.duration", 1.5, nil)
+	r.Count(Metric{Name: "forwarder.invocations", tier: TierBasic}, 1, map[string]interface{}{"status": "success"})
+	r.Summary(Metric{Name: "forwarder.delivery.duration", tier: TierBasic}, 1.5, nil)
 
 	client := &mockClient{}
 	client.On("CreateMetricEntry", mock.Anything).Return(nil)
@@ -137,8 +137,8 @@ func TestRecorder_FlushSendsPayload(t *testing.T) {
 func TestRecorder_FlushDataPointsIncludeIntervalMs(t *testing.T) {
 	setTier(t, common.MetricsTierBasic)
 	r := NewRecorder(nil)
-	r.Count(TierBasic, "forwarder.records.received", 2, nil)
-	r.Summary(TierBasic, "forwarder.delivery.duration", 1.5, nil)
+	r.Count(Metric{Name: "forwarder.records.received", tier: TierBasic}, 2, nil)
+	r.Summary(Metric{Name: "forwarder.delivery.duration", tier: TierBasic}, 1.5, nil)
 
 	client := &mockClient{}
 	client.On("CreateMetricEntry", mock.Anything).Return(nil)
@@ -157,8 +157,8 @@ func TestRecorder_FlushDataPointsIncludeIntervalMs(t *testing.T) {
 func TestRecorder_FlushOmitsAttributesWhenEmptyInsteadOfNull(t *testing.T) {
 	setTier(t, common.MetricsTierBasic)
 	r := NewRecorder(nil)
-	r.Count(TierBasic, "forwarder.records.received", 2, nil)
-	r.Count(TierBasic, "forwarder.invocations", 1, map[string]interface{}{"status": "success"})
+	r.Count(Metric{Name: "forwarder.records.received", tier: TierBasic}, 2, nil)
+	r.Count(Metric{Name: "forwarder.invocations", tier: TierBasic}, 1, map[string]interface{}{"status": "success"})
 
 	client := &mockClient{}
 	client.On("CreateMetricEntry", mock.Anything).Return(nil)

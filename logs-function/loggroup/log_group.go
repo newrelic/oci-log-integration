@@ -48,18 +48,18 @@ func splitLogsIntoBatches(ctx context.Context, logs common.OCILoggingEvent, maxP
 			// so it can't drag the pipeline-lag average/min negative, and count the occurrence
 			// separately so the skew stays visible instead of being silently hidden.
 			if lag < 0 {
-				metricRecorder.Count(metrics.TierBasic, metrics.MetricPipelineLagNegative, 1, nil)
+				metricRecorder.Count(metrics.Basic.MetricPipelineLagNegative, 1, nil)
 				lag = 0
 			}
-			metricRecorder.Summary(metrics.TierBasic, metrics.MetricPipelineLag, lag, nil)
+			metricRecorder.Summary(metrics.Basic.MetricPipelineLag, lag, nil)
 		}
 
 		logBytes, err := json.Marshal(logData)
 		if err != nil {
-			metricRecorder.Count(metrics.TierAdvanced, metrics.MetricSerializeErrors, 1, nil)
+			metricRecorder.Count(metrics.Advanced.MetricSerializeErrors, 1, nil)
 			// Also counted as dropped -- otherwise it vanishes from loss accounting entirely,
 			// and received == delivered + dropped no longer reconciles.
-			metricRecorder.Count(metrics.TierBasic, metrics.MetricRecordsDropped, 1, map[string]interface{}{"reason": "serialize_error"})
+			metricRecorder.Count(metrics.Basic.MetricRecordsDropped, 1, map[string]interface{}{"reason": "serialize_error"})
 			log.Warnf("Warning: Could not marshal detailed log for size estimation: %v", err)
 			continue
 		}
@@ -71,7 +71,7 @@ func splitLogsIntoBatches(ctx context.Context, logs common.OCILoggingEvent, maxP
 		// an oversized record arriving after another batch was already flushed would slip
 		// through uncounted.
 		if logSize > maxPayloadSize {
-			metricRecorder.Count(metrics.TierAdvanced, metrics.MetricRecordsOversized, 1, nil)
+			metricRecorder.Count(metrics.Advanced.MetricRecordsOversized, 1, nil)
 		}
 
 		if len(currentBatch) == 0 {
@@ -108,12 +108,12 @@ func splitLogsIntoBatches(ctx context.Context, logs common.OCILoggingEvent, maxP
 func produceBatch(ctx context.Context, channel chan util.BatchMessage, batch common.LogData, commonAttributes common.LogAttributes, batchSize int, extraUnbatched int, metricRecorder *metrics.Recorder) bool {
 	if !util.ProduceMessageToChannel(ctx, channel, batch, commonAttributes, batchSize) {
 		dropped := len(batch) + extraUnbatched
-		metricRecorder.Count(metrics.TierBasic, metrics.MetricRecordsDropped, float64(dropped), map[string]interface{}{"reason": "producer_cancelled"})
+		metricRecorder.Count(metrics.Basic.MetricRecordsDropped, float64(dropped), map[string]interface{}{"reason": "producer_cancelled"})
 		log.Warnf("context cancelled while producing log batch; dropped %d log record(s)", dropped)
 		return false
 	}
 
-	metricRecorder.Count(metrics.TierAdvanced, metrics.MetricBatchesCreated, 1, nil)
-	metricRecorder.Summary(metrics.TierAdvanced, metrics.MetricBatchSizeBytes, float64(batchSize), nil)
+	metricRecorder.Count(metrics.Advanced.MetricBatchesCreated, 1, nil)
+	metricRecorder.Summary(metrics.Advanced.MetricBatchSizeBytes, float64(batchSize), nil)
 	return true
 }

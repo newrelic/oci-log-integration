@@ -30,15 +30,15 @@ func (event *Event) Unmarshal(in io.Reader, rec *metrics.Recorder) error {
 	if err != nil {
 		log.Panicf("Error reading incoming payload: %v\n", err)
 	}
-	rec.Count(metrics.TierAdvanced, metrics.MetricBytesReceived, float64(len(payloadBytes)), nil)
+	rec.Count(metrics.Advanced.MetricBytesReceived, float64(len(payloadBytes)), nil)
 
 	var incomingLogEvent common.OCILoggingEvent
 	if err := json.Unmarshal(payloadBytes, &incomingLogEvent); err == nil {
 		event.EventType = OCI_LOGGING
 		event.OCILoggingEvent = incomingLogEvent
-		rec.Count(metrics.TierBasic, metrics.MetricRecordsReceived, float64(len(incomingLogEvent)), nil)
+		rec.Count(metrics.Basic.MetricRecordsReceived, float64(len(incomingLogEvent)), nil)
 	} else {
-		rec.Count(metrics.TierAdvanced, metrics.MetricDecodeErrors, 1, map[string]interface{}{"error_class": fmt.Sprintf("%T", err)})
+		rec.Count(metrics.Advanced.MetricDecodeErrors, 1, map[string]interface{}{"error_class": fmt.Sprintf("%T", err)})
 		log.Panicf("Error decoding incoming log events payload: %v", err)
 	}
 

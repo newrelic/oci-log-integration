@@ -43,57 +43,76 @@ func (t Tier) enabledFor(configured Tier) bool {
 	return configured != TierNone && configured >= t
 }
 
-// Metric name constants for every forwarder.* metric this package emits. Call sites pass
-// these (instead of ad hoc string literals) so MetricsByTier below stays the single place
-// that documents which tier each metric belongs to.
-const (
-	MetricInvocations         = "forwarder.invocations"
-	MetricRecordsReceived     = "forwarder.records.received"
-	MetricRecordsDelivered    = "forwarder.records.delivered"
-	MetricRecordsDropped      = "forwarder.records.dropped"
-	MetricDeliveryDuration    = "forwarder.delivery.duration"
-	MetricPipelineLag         = "forwarder.pipeline.lag"
-	MetricPipelineLagNegative = "forwarder.pipeline.lag.negative"
+// Metric bundles a forwarder.* metric's name together with the tier it belongs to, so a call
+// site passes one identifier instead of separately supplying a tier that must be kept in sync
+// with the metric by hand.
+type Metric struct {
+	Name string
+	tier Tier
+}
 
-	MetricClientInitErrors = "forwarder.client.init.errors"
-	MetricRunDuration      = "forwarder.run.duration"
-	MetricDeliveryErrors   = "forwarder.delivery.errors"
-	MetricBytesDelivered   = "forwarder.bytes.delivered"
-	MetricClientCache      = "forwarder.client.cache"
-	MetricBytesReceived    = "forwarder.bytes.received"
-	MetricDecodeErrors     = "forwarder.decode.errors"
-	MetricSerializeErrors  = "forwarder.serialize.errors"
-	MetricRecordsOversized = "forwarder.records.oversized"
-	MetricBatchesCreated   = "forwarder.batches.created"
-	MetricBatchSizeBytes   = "forwarder.batch.size_bytes"
-)
+// enabledFor reports whether m should be emitted under the customer's configured tier.
+func (m Metric) enabledFor(configured Tier) bool {
+	return m.tier.enabledFor(configured)
+}
 
-// MetricsByTier documents which forwarder.* metrics are declared at each tier, purely for
-// visibility -- it is not consulted by Recorder.Count/Summary, which are gated by the Tier
-// argument passed at the call site. Keyed by Tier (rather than by metric name) so browsing
-// "what does TierBasic include" is a single lookup: MetricsByTier[TierBasic]. Keep this in
-// sync with those call sites by hand; there is currently no static check enforcing it.
-var MetricsByTier = map[Tier][]string{
-	TierBasic: {
-		MetricInvocations,
-		MetricRecordsReceived,
-		MetricRecordsDelivered,
-		MetricRecordsDropped,
-		MetricDeliveryDuration,
-		MetricPipelineLag,
-		MetricPipelineLagNegative,
-	},
-	TierAdvanced: {
-		MetricClientInitErrors,
-		MetricRunDuration,
-		MetricDeliveryErrors,
-		MetricBytesDelivered,
-		MetricClientCache,
-		MetricBytesReceived,
-		MetricDecodeErrors,
-		MetricSerializeErrors,
-		MetricRecordsOversized,
-		MetricBatchesCreated,
-		MetricBatchSizeBytes,
-	},
+// basic and advanced build a Metric for their respective tier, so Basic/Advanced below don't
+// each repeat their own tier on every line -- which would let a copy-paste mistake put a
+// TierAdvanced metric inside the Basic struct (or vice versa) without anything catching it.
+func basic(name string) Metric    { return Metric{Name: name, tier: TierBasic} }
+func advanced(name string) Metric { return Metric{Name: name, tier: TierAdvanced} }
+
+// BasicMetrics groups every forwarder.* metric declared at TierBasic. Access them as
+// metrics.Basic.MetricInvocations, etc. -- the namespace itself says which tier a metric
+// belongs to, so a call site never needs to state the tier separately.
+type BasicMetrics struct {
+	MetricInvocations         Metric
+	MetricRecordsReceived     Metric
+	MetricRecordsDelivered    Metric
+	MetricRecordsDropped      Metric
+	MetricDeliveryDuration    Metric
+	MetricPipelineLag         Metric
+	MetricPipelineLagNegative Metric
+}
+
+// AdvancedMetrics groups every forwarder.* metric declared at TierAdvanced. Access them as
+// metrics.Advanced.MetricBytesReceived, etc.
+type AdvancedMetrics struct {
+	MetricClientInitErrors Metric
+	MetricRunDuration      Metric
+	MetricDeliveryErrors   Metric
+	MetricBytesDelivered   Metric
+	MetricClientCache      Metric
+	MetricBytesReceived    Metric
+	MetricDecodeErrors     Metric
+	MetricSerializeErrors  Metric
+	MetricRecordsOversized Metric
+	MetricBatchesCreated   Metric
+	MetricBatchSizeBytes   Metric
+}
+
+// Basic holds every TierBasic metric this package emits.
+var Basic = BasicMetrics{
+	MetricInvocations:         basic("forwarder.invocations"),
+	MetricRecordsReceived:     basic("forwarder.records.received"),
+	MetricRecordsDelivered:    basic("forwarder.records.delivered"),
+	MetricRecordsDropped:      basic("forwarder.records.dropped"),
+	MetricDeliveryDuration:    basic("forwarder.delivery.duration"),
+	MetricPipelineLag:         basic("forwarder.pipeline.lag"),
+	MetricPipelineLagNegative: basic("forwarder.pipeline.lag.negative"),
+}
+
+// Advanced holds every TierAdvanced metric this package emits.
+var Advanced = AdvancedMetrics{
+	MetricClientInitErrors: advanced("forwarder.client.init.errors"),
+	MetricRunDuration:      advanced("forwarder.run.duration"),
+	MetricDeliveryErrors:   advanced("forwarder.delivery.errors"),
+	MetricBytesDelivered:   advanced("forwarder.bytes.delivered"),
+	MetricClientCache:      advanced("forwarder.client.cache"),
+	MetricBytesReceived:    advanced("forwarder.bytes.received"),
+	MetricDecodeErrors:     advanced("forwarder.decode.errors"),
+	MetricSerializeErrors:  advanced("forwarder.serialize.errors"),
+	MetricRecordsOversized: advanced("forwarder.records.oversized"),
+	MetricBatchesCreated:   advanced("forwarder.batches.created"),
+	MetricBatchSizeBytes:   advanced("forwarder.batch.size_bytes"),
 }

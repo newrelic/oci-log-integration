@@ -60,39 +60,39 @@ func (r *Recorder) Tier() Tier {
 	return r.tier
 }
 
-// Count adds value to a counter metric, gated by tier. attrs may be nil.
-func (r *Recorder) Count(tier Tier, name string, value float64, attrs map[string]interface{}) {
-	if r == nil || !tier.enabledFor(r.tier) {
+// Count adds value to a counter metric, gated by m's tier. attrs may be nil.
+func (r *Recorder) Count(m Metric, value float64, attrs map[string]interface{}) {
+	if r == nil || !m.enabledFor(r.tier) {
 		return
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	key := metricKey(name, attrs)
+	key := metricKey(m.Name, attrs)
 	p, ok := r.counts[key]
 	if !ok {
-		p = &countPoint{name: name, attrs: attrs}
+		p = &countPoint{name: m.Name, attrs: attrs}
 		r.counts[key] = p
 	}
 	p.value += value
 }
 
 // Summary records one observation of a distribution-style metric (durations, sizes, lag),
-// gated by tier. Observations sharing the same name+attrs within an invocation are
+// gated by m's tier. Observations sharing the same name+attrs within an invocation are
 // aggregated into a single New Relic "summary" data point (count/sum/min/max) at flush time.
-func (r *Recorder) Summary(tier Tier, name string, value float64, attrs map[string]interface{}) {
-	if r == nil || !tier.enabledFor(r.tier) {
+func (r *Recorder) Summary(m Metric, value float64, attrs map[string]interface{}) {
+	if r == nil || !m.enabledFor(r.tier) {
 		return
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	key := metricKey(name, attrs)
+	key := metricKey(m.Name, attrs)
 	p, ok := r.summaries[key]
 	if !ok {
-		p = &summaryPoint{name: name, attrs: attrs, min: value, max: value}
+		p = &summaryPoint{name: m.Name, attrs: attrs, min: value, max: value}
 		r.summaries[key] = p
 	}
 	p.count++

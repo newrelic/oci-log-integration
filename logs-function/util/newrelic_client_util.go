@@ -53,18 +53,18 @@ func ConsumeLogBatches(ctx context.Context, channel <-chan BatchMessage, wg *syn
 
 			if err != nil {
 				log.Errorf("error posting Log entry: %v", err)
-				rec.Summary(metrics.TierBasic, metrics.MetricDeliveryDuration, duration, map[string]interface{}{"status": "error"})
-				rec.Count(metrics.TierBasic, metrics.MetricRecordsDropped, float64(recordCount), map[string]interface{}{"reason": "delivery_error"})
-				rec.Count(metrics.TierAdvanced, metrics.MetricDeliveryErrors, 1, map[string]interface{}{"error_class": fmt.Sprintf("%T", err), "status": "error"})
+				rec.Summary(metrics.Basic.MetricDeliveryDuration, duration, map[string]interface{}{"status": "error"})
+				rec.Count(metrics.Basic.MetricRecordsDropped, float64(recordCount), map[string]interface{}{"reason": "delivery_error"})
+				rec.Count(metrics.Advanced.MetricDeliveryErrors, 1, map[string]interface{}{"error_class": fmt.Sprintf("%T", err), "status": "error"})
 				// Continue processing other batches instead of terminating
 				continue
 			}
 
-			rec.Summary(metrics.TierBasic, metrics.MetricDeliveryDuration, duration, map[string]interface{}{"status": "success"})
-			rec.Count(metrics.TierBasic, metrics.MetricRecordsDelivered, float64(recordCount), map[string]interface{}{"status": "success"})
+			rec.Summary(metrics.Basic.MetricDeliveryDuration, duration, map[string]interface{}{"status": "success"})
+			rec.Count(metrics.Basic.MetricRecordsDelivered, float64(recordCount), map[string]interface{}{"status": "success"})
 			// SizeBytes was already computed once while building the batch (loggroup);
 			// reuse it here instead of re-marshaling the whole batch just to measure it.
-			rec.Count(metrics.TierAdvanced, metrics.MetricBytesDelivered, float64(msg.SizeBytes), nil)
+			rec.Count(metrics.Advanced.MetricBytesDelivered, float64(msg.SizeBytes), nil)
 		case <-ctx.Done():
 			// Context has been cancelled, exit the goroutine
 			return
@@ -91,13 +91,13 @@ func NewNRClient(rec *metrics.Recorder) (NewRelicClientAPI, error) {
 	if !clientCacheTime.IsZero() && time.Since(clientCacheTime) < cacheTTL(nrClientError) {
 		// Return cached client (even if there was an error before)
 		log.Debug("Returning cached New Relic client")
-		rec.Count(metrics.TierAdvanced, metrics.MetricClientCache, 1, map[string]interface{}{"result": "hit"})
+		rec.Count(metrics.Advanced.MetricClientCache, 1, map[string]interface{}{"result": "hit"})
 		return cachedNRClient, nrClientError
 	}
 
 	// Cache is invalid, expired, or doesn't exist - create new client
 	log.Debug("Initializing/refreshing New Relic client")
-	rec.Count(metrics.TierAdvanced, metrics.MetricClientCache, 1, map[string]interface{}{"result": "miss"})
+	rec.Count(metrics.Advanced.MetricClientCache, 1, map[string]interface{}{"result": "miss"})
 	cachedNRClient, nrClientError = createNRClient()
 	clientCacheTime = time.Now()
 
