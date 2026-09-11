@@ -9,11 +9,6 @@ import (
 	"github.com/newrelic/oci-log-integration/logs-function/logger"
 )
 
-// Defines the event types
-const (
-	OCI_LOGGING = "ociLogging" // OCI_LOGGING represents the event type for Oracle Cloud Infrastructure logging events.
-)
-
 var log = logger.NewLogrusLogger(logger.WithDebugLevel())
 
 // Event represents the unified event structure.
@@ -31,7 +26,7 @@ func (event *Event) Unmarshal(in io.Reader) error {
 
 	var incomingLogEvent common.OCILoggingEvent
 	if err := json.Unmarshal(payloadBytes, &incomingLogEvent); err == nil {
-		event.EventType = OCI_LOGGING
+		event.EventType = common.OCI_LOGGING
 		event.OCILoggingEvent = incomingLogEvent
 	} else {
 		log.Panicf("Error decoding incoming log events payload: %v", err)

@@ -1,11 +1,10 @@
 package resource
 
-import "strings"
+import (
+	"strings"
 
-// ocidPrefix is what every real OCI resource identifier starts with; used to reject
-// look-alike values at a path we'd otherwise treat as an OCID candidate (e.g. API Gateway's
-// "source": "v1-deployment", or VCN flow logs' "source": "-").
-const ocidPrefix = "ocid1."
+	"github.com/newrelic/oci-log-integration/logs-function/common"
+)
 
 // Extraction is what Extract found for one log record: the OCID to associate the log with (if
 // any), a display name already present in the payload for that OCID (if any), and whether a
@@ -31,7 +30,10 @@ func Extract(logData map[string]interface{}) Extraction {
 		return Extraction{}
 	}
 
-	ocid := getOCID(logData, rule.OCIDPath)
+	ocid := getOCID(logData, rule.OCIDPath, logType)
+	if ocid == "" {
+		return Extraction{}
+	}
 
 	var name string
 	if rule.NamePath != "" {
@@ -41,16 +43,23 @@ func Extract(logData map[string]interface{}) Extraction {
 	return Extraction{
 		OCID:         ocid,
 		ExistingName: name,
-		NeedsResolve: ocid != "" && name == "",
+		NeedsResolve: name == "",
 	}
 }
 
 // getOCID reads a dot-path and returns it only if it looks like a real OCI identifier --
 // guards against a rule's OCIDPath resolving to something present but not actually an OCID for
-// a given record (e.g. a field that's usually populated but happens to be empty or "-").
-func getOCID(m map[string]interface{}, path string) string {
+// a given record (e.g. a field that's usually populated but happens to be empty or "-"). logType
+// is used only for the warning below, identifying which rule's path came up empty without
+// logging the record's own field value (customer log content).
+func getOCID(m map[string]interface{}, path string, logType string) string {
 	v, ok := getPath(m, path)
-	if !ok || !strings.HasPrefix(v, ocidPrefix) {
+	if !ok {
+		log.Warnf("resource OCID extraction: type %q matched a rule but path %q was not found", logType, path)
+		return ""
+	}
+	if !strings.HasPrefix(v, common.OCIDPrefix) {
+		log.Warnf("resource OCID extraction: type %q matched a rule but value at path %q does not look like an OCID", logType, path)
 		return ""
 	}
 	return v

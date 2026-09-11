@@ -26,10 +26,7 @@ type Rule struct {
 	// a NamePath) for a type whose name is *always* present -- entity synthesis reads that
 	// native field directly with zero involvement from this package, so extracting/injecting it
 	// here would be dead weight.
-	// This table exists only for types where synthesis has nothing to go on without us: API
-	// Gateway, Service Connector Hub, Functions, Load Balancer, Object Storage, Queue, and
-	// Streaming were all confirmed (via their real entity-synthesis rules, or explicit
-	// confirmation) to always carry a name, and deliberately have no rule here for that reason.
+	// The rules below deliberately exclude types already confirmed to always carry a name (e.g. API Gateway, Queue, Streaming).
 	NamePath string
 }
 

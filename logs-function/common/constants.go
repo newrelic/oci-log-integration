@@ -80,3 +80,13 @@ const (
 	BaseRetryDelay = 100 * time.Millisecond
 	MaxRetryDelay  = 1500 * time.Millisecond
 )
+
+// NameFieldKey is a synthetic field added to capture the resource's name in the OCI payload.
+const NameFieldKey = "logging.oci.displayName"
+
+// OCI_LOGGING represents the event type for Oracle Cloud Infrastructure logging events.
+const OCI_LOGGING = "ociLogging"
+
+// OCIDPrefix is what every real OCI resource identifier starts with; used to reject look-alike
+// values at a path we'd otherwise treat as an OCID candidate.
+const OCIDPrefix = "ocid1."

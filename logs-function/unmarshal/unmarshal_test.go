@@ -17,7 +17,7 @@ func TestUnmarshalJSONOCILoggingData(t *testing.T) {
 	]`)
 
 	expected := Event{
-		EventType: OCI_LOGGING,
+		EventType: common.OCI_LOGGING,
 		OCILoggingEvent: common.OCILoggingEvent{
 			map[string]interface{}{
 				"timestamp":     "2023-01-01T12:00:00Z",
@@ -52,7 +52,7 @@ func TestUnmarshalSingleOCILoggingEvent(t *testing.T) {
 	]`)
 
 	expected := Event{
-		EventType: OCI_LOGGING,
+		EventType: common.OCI_LOGGING,
 		OCILoggingEvent: common.OCILoggingEvent{
 			map[string]interface{}{
 				"timestamp":   "2023-01-01T12:00:00Z",
@@ -118,7 +118,7 @@ func TestUnmarshalComplexOCILoggingEvent(t *testing.T) {
 	]`)
 
 	expected := Event{
-		EventType: OCI_LOGGING,
+		EventType: common.OCI_LOGGING,
 		OCILoggingEvent: common.OCILoggingEvent{
 			map[string]interface{}{
 				"timestamp": "2023-01-01T12:00:00Z",

@@ -58,11 +58,11 @@ func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nr
 	}
 
 	switch event.EventType {
-	case unmarshal.OCI_LOGGING:
+	case common.OCI_LOGGING:
 		logs := event.OCILoggingEvent
 		if resourceNameEnrichmentEnabled() {
 			if searchClient, err := util.NewResourceSearchClient(); err != nil {
-				log.Warnf("resource search client unavailable, skipping resource name enrichment: %v", err)
+				log.Errorf("resource search client unavailable, skipping resource name enrichment: %v", err)
 			} else {
 				logs = resource.EnrichRecords(ctx, logs, util.NewResourceSearchResolver(searchClient))
 			}

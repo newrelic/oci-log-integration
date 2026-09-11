@@ -131,24 +131,12 @@ func resolveTimeout() time.Duration {
 	return time.Duration(seconds) * time.Second
 }
 
-// nameFieldKey is a literal attribute key (dots included, not a nested path) matching the
-// "logging."-namespaced convention for a log-derived version of the oci.displayName golden tag
-// entity synthesis rules already use (see rules.go's YAML-derived rules for oci.displayName
-// appearing as a goldenTag).
-const nameFieldKey = "logging.oci.displayName"
-
-// injectResourceName writes nameFieldKey into the record's data object. A no-op when there's no
-// name.
+// injectResourceName writes common.NameFieldKey as a top-level field of the record itself -- a
+// sibling of "data" and "oracle", not nested inside "data" -- matching where entity synthesis
+// expects the oci.displayName golden tag to be found. A no-op when there's no name.
 func injectResourceName(logData map[string]interface{}, name string) {
 	if name == "" {
 		return
 	}
-
-	data, ok := logData["data"].(map[string]interface{})
-	if !ok {
-		data = map[string]interface{}{}
-		logData["data"] = data
-	}
-
-	data[nameFieldKey] = name
+	logData[common.NameFieldKey] = name
 }

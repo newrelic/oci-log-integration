@@ -75,7 +75,7 @@ func TestEnrichRecords_InjectsResolvedName(t *testing.T) {
 
 	EnrichRecords(context.Background(), records, resolver)
 
-	assert.Equal(t, "prod-firewall", dataOf(t, rec)["logging.oci.displayName"])
+	assert.Equal(t, "prod-firewall", rec["logging.oci.displayName"])
 }
 
 func TestEnrichRecords_PartialResolveFailureStillInjectsWhatResolved(t *testing.T) {
@@ -99,9 +99,9 @@ func TestEnrichRecords_PartialResolveFailureStillInjectsWhatResolved(t *testing.
 		EnrichRecords(context.Background(), records, resolver)
 	})
 
-	assert.Equal(t, "prod-firewall", dataOf(t, firewallRec)["logging.oci.displayName"])
+	assert.Equal(t, "prod-firewall", firewallRec["logging.oci.displayName"])
 
-	assert.NotContains(t, dataOf(t, dnsRec), "logging.oci.displayName", "unresolved OCID should not get a name")
+	assert.NotContains(t, dnsRec, "logging.oci.displayName", "unresolved OCID should not get a name")
 }
 
 func TestEnrichRecords_NilResolverNeverInjectsAName(t *testing.T) {
@@ -112,7 +112,7 @@ func TestEnrichRecords_NilResolverNeverInjectsAName(t *testing.T) {
 		EnrichRecords(context.Background(), records, nil)
 	})
 
-	assert.NotContains(t, dataOf(t, rec), "logging.oci.displayName", "no resolver was available, so this can't have gotten a name")
+	assert.NotContains(t, rec, "logging.oci.displayName", "no resolver was available, so this can't have gotten a name")
 }
 
 func TestEnrichRecords_UnmatchedRecordGetsNoInjectionAtAll(t *testing.T) {
@@ -123,8 +123,8 @@ func TestEnrichRecords_UnmatchedRecordGetsNoInjectionAtAll(t *testing.T) {
 	EnrichRecords(context.Background(), records, resolver)
 
 	assert.Zero(t, resolver.callCount)
+	assert.NotContains(t, rec, "logging.oci.displayName", "an unmatched record should gain no new keys at all")
 	data := dataOf(t, rec)
-	assert.NotContains(t, data, "logging.oci.displayName", "an unmatched record should gain no new keys at all")
 	assert.Len(t, data, 1, "the record's own pre-existing data map (just resourceId) should be untouched, not added to")
 }
 
@@ -138,7 +138,7 @@ func TestEnrichRecords_RecordWithNoDataMapNeverGetsOneCreated(t *testing.T) {
 	EnrichRecords(context.Background(), records, &fakeResolver{})
 
 	_, dataExists := rec["data"]
-	assert.False(t, dataExists, "injectResourceName's early return means a data map is never created when there's nothing to write")
+	assert.False(t, dataExists, "injectResourceName never touches \"data\" at all -- it writes the name as a top-level field instead")
 }
 
 func TestResolveTimeout(t *testing.T) {
@@ -207,11 +207,10 @@ func TestEnrichRecords_RealSamples(t *testing.T) {
 
 			EnrichRecords(context.Background(), records, resolver)
 
-			data := dataOf(t, record)
 			if tt.wantName == "" {
-				assert.NotContains(t, data, "logging.oci.displayName")
+				assert.NotContains(t, record, "logging.oci.displayName")
 			} else {
-				assert.Equal(t, tt.wantName, data["logging.oci.displayName"])
+				assert.Equal(t, tt.wantName, record["logging.oci.displayName"])
 			}
 			pretty, err := json.MarshalIndent(record, "", "  ")
 			if err == nil {
@@ -282,7 +281,6 @@ func TestEnrichRecords_RealSamples_CombinedBatch(t *testing.T) {
 
 	for i, rec := range records {
 		logType, _ := rec["type"].(string)
-		data := dataOf(t, rec)
 		// re-derive the OCID from the original payload fields (rules.go's OCIDPath) rather than
 		// from an injected field, since the name-only injection no longer records the OCID itself.
 		ocid := Extract(rec).OCID
@@ -295,7 +293,7 @@ func TestEnrichRecords_RealSamples_CombinedBatch(t *testing.T) {
 			require.NotEmpty(t, ocid, "record %d: every sample in this batch matches a rule", i)
 			want, ok := wantNameForOCID[ocid]
 			require.True(t, ok, "record %d: unexpected OCID %s not accounted for in this test", i, ocid)
-			assert.Equal(t, want, data["logging.oci.displayName"], "record %d (type=%s, ocid=%s)", i, logType, ocid)
+			assert.Equal(t, want, rec["logging.oci.displayName"], "record %d (type=%s, ocid=%s)", i, logType, ocid)
 		})
 	}
 }

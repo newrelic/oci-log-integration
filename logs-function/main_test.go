@@ -201,8 +201,7 @@ func TestHandleFunctionWithClient_EnrichmentEnabledButClientUnavailable(t *testi
 		if !ok || len(detailedBatch) == 0 || len(detailedBatch[0].Entries) == 0 {
 			return false
 		}
-		data, _ := detailedBatch[0].Entries[0]["data"].(map[string]interface{})
-		_, hasInjectedName := data["logging.oci.displayName"]
+		_, hasInjectedName := detailedBatch[0].Entries[0]["logging.oci.displayName"]
 		return !hasInjectedName // the client failed, so enrichment must not have run at all
 	})).Return(nil).Once()
 
