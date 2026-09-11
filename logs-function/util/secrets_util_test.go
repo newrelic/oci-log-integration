@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/oracle/oci-go-sdk/v65/secrets"
 	"github.com/stretchr/testify/assert"
@@ -244,6 +245,45 @@ func TestGetLicenseKeyWithMockClient(t *testing.T) {
 	}
 }
 
+// resetLicenseKeyCache clears GetLicenseKey's TTL cache between test cases that expect a
+// fresh Vault fetch, mirroring resetNRClient in newrelic_client_util_test.go.
+func resetLicenseKeyCache() {
+	licenseKeyCacheMu.Lock()
+	defer licenseKeyCacheMu.Unlock()
+	cachedLicenseKey = ""
+	cachedLicenseKeyErr = nil
+	licenseKeyCachedAt = time.Time{}
+}
+
+// A failed Vault fetch must not be cached for the full (default 10-minute) success-case
+// TTL: that would silently block both the logs and metrics clients from recovering from one
+// transient Vault blip for the whole window.
+func TestCacheTTL_CachedErrorUsesShorterNegativeTTL(t *testing.T) {
+	defer os.Unsetenv(common.ClientTTL)
+	assert.NoError(t, os.Unsetenv(common.ClientTTL)) // default (600s) success-case TTL
+
+	ttl := cacheTTL(errors.New("boom"))
+
+	assert.Equal(t, time.Duration(common.NegativeCacheTTLSeconds)*time.Second, ttl)
+}
+
+// An explicitly configured CLIENT_TTL shorter than the negative-cache TTL must still be
+// honored for a cached error, rather than being lengthened.
+func TestCacheTTL_CachedErrorHonorsShorterConfiguredTTL(t *testing.T) {
+	defer os.Unsetenv(common.ClientTTL)
+	assert.NoError(t, os.Setenv(common.ClientTTL, "1"))
+
+	assert.Equal(t, 1*time.Second, cacheTTL(errors.New("boom")))
+}
+
+// A cached success is unaffected: it keeps the full configured TTL.
+func TestCacheTTL_CachedSuccessUsesConfiguredTTL(t *testing.T) {
+	defer os.Unsetenv(common.ClientTTL)
+	assert.NoError(t, os.Unsetenv(common.ClientTTL))
+
+	assert.Equal(t, getClientTTL(), cacheTTL(nil))
+}
+
 // Helper function to extract license key from secret (for testing)
 func extractLicenseKeyFromSecret(secretValue string) (string, error) {
 	if secretValue == "" {
@@ -316,6 +356,26 @@ func TestGetSecretFromOCIVault_EdgeCases(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGetLicenseKey_CachesWithinTTL verifies repeated calls within the TTL window reuse the
+// cached result instead of hitting Vault again, mirroring
+// TestNewNRClient_CacheExpiration's approach for the logs client cache.
+func TestGetLicenseKey_CachesWithinTTL(t *testing.T) {
+	resetLicenseKeyCache()
+	assert.NoError(t, os.Setenv(common.ClientTTL, "1"))
+	defer os.Unsetenv(common.ClientTTL)
+
+	_, _ = GetLicenseKey()
+	firstCachedAt := licenseKeyCachedAt
+
+	_, _ = GetLicenseKey()
+	assert.Equal(t, firstCachedAt, licenseKeyCachedAt, "second call within TTL should not re-fetch")
+
+	time.Sleep(2 * time.Second)
+
+	_, _ = GetLicenseKey()
+	assert.True(t, licenseKeyCachedAt.After(firstCachedAt), "call after TTL expiration should re-fetch")
 }
 
 func TestGetLicenseKeyError(t *testing.T) {
@@ -399,6 +459,7 @@ func TestGetLicenseKeyError(t *testing.T) {
 				}
 			}
 
+			resetLicenseKeyCache()
 			key, err := GetLicenseKey()
 
 			if err == nil {

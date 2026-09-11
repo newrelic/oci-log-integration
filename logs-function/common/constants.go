@@ -28,6 +28,12 @@ const ClientTTL = "CLIENT_TTL"
 // DefaultClientTTL is the default TTL for the NewRelic client cache in seconds (10 minutes = 600 seconds).
 const DefaultClientTTL = 600
 
+// NegativeCacheTTLSeconds bounds how long a failed license-key fetch or Metrics client
+// creation is cached before being retried, in seconds. Kept much shorter than
+// ClientTTL/DefaultClientTTL so a transient Vault blip or config error recovers quickly
+// instead of being replayed as a cached failure for the full success-case TTL.
+const NegativeCacheTTLSeconds = 30
+
 // MaxPayloadSize is the maximum size of a payload.
 // Reference: https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/#limits
 const MaxPayloadSize = 1 * 1024 * 1024 // 1 mb
@@ -37,3 +43,32 @@ const LicenseKey = "licenseKey"
 
 // Message channel size
 const MessageChannelSize = 10
+
+// MetricsTier is the name of the environment variable that selects which tier of
+// custom forwarder.* metrics is emitted (none/basic/advanced).
+const MetricsTier = "FORWARDER_METRICS_TIER"
+
+// Metrics tier values accepted by MetricsTier.
+const (
+	MetricsTierNone     = "none"
+	MetricsTierBasic    = "basic"
+	MetricsTierAdvanced = "advanced"
+)
+
+// FunctionNameEnvVar is the environment variable the Fn/OCI Functions runtime injects
+// automatically at invocation time with the function's name.
+const FunctionNameEnvVar = "FN_FN_NAME"
+
+// ApplicationNameEnvVar is the environment variable the Fn/OCI Functions runtime injects
+// automatically at invocation time with the function's parent Application's name.
+const ApplicationNameEnvVar = "FN_APP_NAME"
+
+// TenancyName is the environment variable name for the OCI tenancy's display name, set by
+// Terraform (from data.oci_identity_tenancy) so multiple forwarders reporting into one New
+// Relic account can be told apart by tenancy without an extra per-invocation API call.
+const TenancyName = "TENANCY_NAME"
+
+// CompartmentName is the environment variable name for the OCI compartment's display name
+// (not OCID -- kept human-readable and bounded), set by Terraform for the same reason as
+// TenancyName.
+const CompartmentName = "COMPARTMENT_NAME"

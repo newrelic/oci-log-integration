@@ -4,12 +4,15 @@ package util
 
 import (
 	"context"
+	"errors"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/newrelic/oci-log-integration/logs-function/common"
+	"github.com/newrelic/oci-log-integration/logs-function/metrics"
+	"github.com/newrelic/oci-log-integration/logs-function/metrics/metricstest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -37,10 +40,10 @@ func TestConsumeLogBatches(t *testing.T) {
 	mockNRClient := new(MockNRClient)
 	mockNRClient.On("CreateLogEntry", mock.Anything).Return(nil)
 
-	channel := make(chan common.DetailedLogsBatch, 1)
+	channel := make(chan BatchMessage, 1)
 	wg := new(sync.WaitGroup)
 
-	logBatch := []common.DetailedLog{{
+	logBatch := common.DetailedLogsBatch{{
 		CommonData: common.Common{
 			Attributes: common.LogAttributes{
 				"compartmentId": "ocid1.compartment.oc1..aaaaaaaa",
@@ -50,11 +53,11 @@ func TestConsumeLogBatches(t *testing.T) {
 		},
 	}}
 
-	channel <- logBatch
+	channel <- BatchMessage{Batch: logBatch}
 
 	ctx := context.TODO()
 	wg.Add(1)
-	go ConsumeLogBatches(ctx, channel, wg, mockNRClient)
+	go ConsumeLogBatches(ctx, channel, wg, mockNRClient, nil)
 	close(channel)
 	wg.Wait()
 	mockNRClient.AssertNumberOfCalls(t, "CreateLogEntry", 1)
@@ -143,11 +146,11 @@ func TestNewNRClient_CacheLogic(t *testing.T) {
 		}
 	}()
 
-	_, _ = NewNRClient()
+	_, _ = NewNRClient(nil)
 	firstCacheTime := clientCacheTime
 	assert.False(t, firstCacheTime.IsZero(), "Cache time should be set after first call")
 
-	_, _ = NewNRClient()
+	_, _ = NewNRClient(nil)
 	secondCacheTime := clientCacheTime
 	assert.Equal(t, firstCacheTime, secondCacheTime, "Cache time should not change for cached response")
 }
@@ -175,12 +178,12 @@ func TestNewNRClient_CacheExpiration(t *testing.T) {
 		}
 	}()
 
-	_, _ = NewNRClient()
+	_, _ = NewNRClient(nil)
 	firstCacheTime := clientCacheTime
 
 	time.Sleep(2 * time.Second)
 
-	_, _ = NewNRClient()
+	_, _ = NewNRClient(nil)
 	secondCacheTime := clientCacheTime
 
 	assert.True(t, secondCacheTime.After(firstCacheTime), "Cache should have been refreshed after TTL expiration")
@@ -189,21 +192,21 @@ func TestNewNRClient_CacheExpiration(t *testing.T) {
 // TestConsumeLogBatches_ErrorHandling tests error handling in log processing
 func TestConsumeLogBatches_ErrorHandling(t *testing.T) {
 	mockNRClient := new(MockNRClient)
-	
+
 	mockNRClient.On("CreateLogEntry", mock.Anything).Return(assert.AnError)
 
-	channel := make(chan common.DetailedLogsBatch, 2)
+	channel := make(chan BatchMessage, 2)
 	wg := new(sync.WaitGroup)
 
 	// Send two batches
-	logBatch1 := []common.DetailedLog{{
+	logBatch1 := common.DetailedLogsBatch{{
 		CommonData: common.Common{
 			Attributes: common.LogAttributes{
 				"compartmentId": "ocid1.compartment.oc1..aaaaaaaa",
 			},
 		},
 	}}
-	logBatch2 := []common.DetailedLog{{
+	logBatch2 := common.DetailedLogsBatch{{
 		CommonData: common.Common{
 			Attributes: common.LogAttributes{
 				"compartmentId": "ocid1.compartment.oc1..bbbbbbbbb",
@@ -211,14 +214,195 @@ func TestConsumeLogBatches_ErrorHandling(t *testing.T) {
 		},
 	}}
 
-	channel <- logBatch1
-	channel <- logBatch2
+	channel <- BatchMessage{Batch: logBatch1}
+	channel <- BatchMessage{Batch: logBatch2}
 
 	ctx := context.TODO()
 	wg.Add(1)
-	go ConsumeLogBatches(ctx, channel, wg, mockNRClient)
+	go ConsumeLogBatches(ctx, channel, wg, mockNRClient, nil)
 	close(channel)
 	wg.Wait()
-	
+
 	mockNRClient.AssertNumberOfCalls(t, "CreateLogEntry", 2)
+}
+
+// TestConsumeLogBatches_RecordsDeliveredMetrics verifies a successful delivery records
+// forwarder.records.delivered and forwarder.delivery.duration.
+func TestConsumeLogBatches_RecordsDeliveredMetrics(t *testing.T) {
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierBasic))
+	defer os.Unsetenv(common.MetricsTier)
+
+	mockNRClient := new(MockNRClient)
+	mockNRClient.On("CreateLogEntry", mock.Anything).Return(nil)
+
+	rec := metrics.NewRecorder(nil)
+	channel := make(chan BatchMessage, 1)
+	channel <- BatchMessage{Batch: common.DetailedLogsBatch{{Entries: common.LogData{
+		map[string]interface{}{"message": "one"},
+		map[string]interface{}{"message": "two"},
+	}}}}
+
+	ctx := context.TODO()
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go ConsumeLogBatches(ctx, channel, wg, mockNRClient, rec)
+	close(channel)
+	wg.Wait()
+
+	names := metricstest.FlushedMetricNames(t, rec)
+	assert.True(t, names["forwarder.records.delivered"])
+	assert.True(t, names["forwarder.delivery.duration"])
+	assert.False(t, names["forwarder.records.dropped"])
+}
+
+// TestConsumeLogBatches_RecordsDroppedMetrics verifies a failed delivery records
+// forwarder.records.dropped instead of the success metrics.
+func TestConsumeLogBatches_RecordsDroppedMetrics(t *testing.T) {
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierBasic))
+	defer os.Unsetenv(common.MetricsTier)
+
+	mockNRClient := new(MockNRClient)
+	mockNRClient.On("CreateLogEntry", mock.Anything).Return(assert.AnError)
+
+	rec := metrics.NewRecorder(nil)
+	channel := make(chan BatchMessage, 1)
+	channel <- BatchMessage{Batch: common.DetailedLogsBatch{{Entries: common.LogData{
+		map[string]interface{}{"message": "one"},
+	}}}}
+
+	ctx := context.TODO()
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go ConsumeLogBatches(ctx, channel, wg, mockNRClient, rec)
+	close(channel)
+	wg.Wait()
+
+	names := metricstest.FlushedMetricNames(t, rec)
+	assert.True(t, names["forwarder.records.dropped"])
+	assert.False(t, names["forwarder.records.delivered"])
+}
+
+// TestConsumeLogBatches_AdvancedTier_RecordsBytesDelivered verifies forwarder.bytes.delivered
+// is recorded (in addition to the basic-tier metrics) at the advanced tier.
+func TestConsumeLogBatches_AdvancedTier_RecordsBytesDelivered(t *testing.T) {
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierAdvanced))
+	defer os.Unsetenv(common.MetricsTier)
+
+	mockNRClient := new(MockNRClient)
+	mockNRClient.On("CreateLogEntry", mock.Anything).Return(nil)
+
+	rec := metrics.NewRecorder(nil)
+	channel := make(chan BatchMessage, 1)
+	channel <- BatchMessage{
+		Batch: common.DetailedLogsBatch{{Entries: common.LogData{
+			map[string]interface{}{"message": "one"},
+		}}},
+		SizeBytes: 123,
+	}
+
+	ctx := context.TODO()
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go ConsumeLogBatches(ctx, channel, wg, mockNRClient, rec)
+	close(channel)
+	wg.Wait()
+
+	payload := metricstest.FlushedPayload(t, rec)
+	metricsList := payload[0]["metrics"].([]map[string]interface{})
+
+	var found bool
+	for _, dp := range metricsList {
+		if dp["name"] == "forwarder.bytes.delivered" {
+			found = true
+			assert.Equal(t, float64(123), dp["value"], "should reuse the pre-computed SizeBytes rather than re-marshaling the batch")
+		}
+	}
+	assert.True(t, found, "expected forwarder.bytes.delivered to be recorded")
+}
+
+// TestConsumeLogBatches_AdvancedTier_RecordsDeliveryErrors verifies forwarder.delivery.errors
+// is recorded (in addition to forwarder.records.dropped) at the advanced tier.
+func TestConsumeLogBatches_AdvancedTier_RecordsDeliveryErrors(t *testing.T) {
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierAdvanced))
+	defer os.Unsetenv(common.MetricsTier)
+
+	mockNRClient := new(MockNRClient)
+	mockNRClient.On("CreateLogEntry", mock.Anything).Return(assert.AnError)
+
+	rec := metrics.NewRecorder(nil)
+	channel := make(chan BatchMessage, 1)
+	channel <- BatchMessage{Batch: common.DetailedLogsBatch{{Entries: common.LogData{
+		map[string]interface{}{"message": "one"},
+	}}}}
+
+	ctx := context.TODO()
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go ConsumeLogBatches(ctx, channel, wg, mockNRClient, rec)
+	close(channel)
+	wg.Wait()
+
+	names := metricstest.FlushedMetricNames(t, rec)
+	assert.True(t, names["forwarder.delivery.errors"])
+}
+
+// TestNewNRClient_RecordsCacheHitMiss verifies forwarder.client.cache fires with
+// result=miss on the first (cold) call and result=hit on a subsequent call within the TTL.
+func TestNewNRClient_RecordsCacheHitMiss(t *testing.T) {
+	resetNRClient()
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierAdvanced))
+	assert.NoError(t, os.Setenv(common.NewRelicRegion, "US"))
+	defer os.Unsetenv(common.MetricsTier)
+	defer os.Unsetenv(common.NewRelicRegion)
+
+	rec := metrics.NewRecorder(nil)
+
+	_, _ = NewNRClient(rec)
+	_, _ = NewNRClient(rec)
+
+	names := metricstest.FlushedMetricNames(t, rec)
+	assert.True(t, names["forwarder.client.cache"])
+}
+
+// TestNewNRClient_ErrorNotCachedForFullTTL verifies a failed NewNRClient result is retried
+// after the short negative-cache TTL rather than being replayed for the full CLIENT_TTL.
+func TestNewNRClient_ErrorNotCachedForFullTTL(t *testing.T) {
+	resetNRClient()
+	assert.NoError(t, os.Setenv(common.ClientTTL, "1"))
+	assert.NoError(t, os.Setenv(common.NewRelicRegion, "us"))
+	defer os.Unsetenv(common.ClientTTL)
+	defer os.Unsetenv(common.NewRelicRegion)
+
+	_, err := NewNRClient(nil)
+	assert.Error(t, err, "expected a Vault/license-key fetch failure outside a real OCI environment")
+	firstCacheTime := clientCacheTime
+
+	time.Sleep(2 * time.Second)
+
+	_, _ = NewNRClient(nil)
+	assert.True(t, clientCacheTime.After(firstCacheTime), "a cached failure should be retried well within CLIENT_TTL")
+}
+
+// TestNRClientErrorClass verifies NewNRClient failures are classified by actual cause
+// (region misconfig vs. secret/license-key fetch failure) rather than lumped into one
+// bucket, so callers can label observability metrics accurately.
+func TestNRClientErrorClass(t *testing.T) {
+	assert.Equal(t, "unknown", NRClientErrorClass(nil))
+	assert.Equal(t, "unknown", NRClientErrorClass(errors.New("some unrelated error")))
+	assert.Equal(t, "region_config", NRClientErrorClass(&classifiedError{class: clientErrorClassRegion, err: errors.New("bad region")}))
+	assert.Equal(t, "secret_fetch", NRClientErrorClass(&classifiedError{class: clientErrorClassSecret, err: errors.New("vault error")}))
+}
+
+// TestCreateNRClient_ClassifiesSecretFetchFailure verifies a GetLicenseKey failure (the only
+// createNRClient failure mode reachable outside a real OCI environment, since region.Get
+// falls back rather than erroring) is classified as secret_fetch.
+func TestCreateNRClient_ClassifiesSecretFetchFailure(t *testing.T) {
+	resetLicenseKeyCache()
+	assert.NoError(t, os.Setenv(common.NewRelicRegion, "us"))
+	defer os.Unsetenv(common.NewRelicRegion)
+
+	_, err := createNRClient()
+
+	assert.Error(t, err)
+	assert.Equal(t, "secret_fetch", NRClientErrorClass(err))
 }

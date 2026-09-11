@@ -3,9 +3,13 @@
 package loggroup
 
 import (
+	"context"
 	"encoding/json"
+	"time"
+
 	"github.com/newrelic/oci-log-integration/logs-function/common"
 	"github.com/newrelic/oci-log-integration/logs-function/logger"
+	"github.com/newrelic/oci-log-integration/logs-function/metrics"
 	"github.com/newrelic/oci-log-integration/logs-function/util"
 )
 
@@ -14,38 +18,71 @@ var log = logger.NewLogrusLogger(logger.WithDebugLevel())
 // ProcessLogs processes OCI logging events and splits them into batches for New Relic ingestion.
 // It adds instrumentation metadata to each batch and sends the batches through the provided channel.
 // The function respects payload size limits to ensure compatibility with New Relic's API constraints.
-func ProcessLogs(OCILoggingEvent common.OCILoggingEvent, channel chan common.DetailedLogsBatch) {
+// metricRecorder may be nil.
+func ProcessLogs(ctx context.Context, OCILoggingEvent common.OCILoggingEvent, channel chan util.BatchMessage, metricRecorder *metrics.Recorder) {
 	attributes := common.LogAttributes{
 		"instrumentation.provider": common.InstrumentationProvider,
 		"instrumentation.name":     common.InstrumentationName,
 		"instrumentation.version":  common.InstrumentationVersion,
 	}
 
-	splitLogsIntoBatches(OCILoggingEvent, common.MaxPayloadSize, attributes, channel)
+	splitLogsIntoBatches(ctx, OCILoggingEvent, common.MaxPayloadSize, attributes, channel, metricRecorder)
 }
 
 // splitLogsIntoBatches splits the incoming logs into batches for processing.
-// It loosely respects (if a single log entry exceeds the maximum payload size we still try to send it) 
-// the maximum payload size and sends each batch through the provided channel.
-func splitLogsIntoBatches(logs common.OCILoggingEvent, maxPayloadSize int, commonAttributes common.LogAttributes, channel chan common.DetailedLogsBatch) {
+// It loosely respects (if a single log entry exceeds the maximum payload size we still try to send it)
+// the maximum payload size and sends each batch through the provided channel. It stops early if
+// ctx is cancelled while trying to hand a batch to the (full) channel, rather than blocking
+// forever on a stuck consumer.
+func splitLogsIntoBatches(ctx context.Context, logs common.OCILoggingEvent, maxPayloadSize int, commonAttributes common.LogAttributes, channel chan util.BatchMessage, metricRecorder *metrics.Recorder) {
 	var currentBatch common.LogData
 	currentBatchSize := 0
 
-	for _, logData := range logs {
+	for i, logData := range logs {
+		if env := metrics.ExtractEnvelope(logData); env.HasLagTime {
+			lag := time.Since(env.LagTime).Seconds()
+			// Lag is anchored on OCI's ingestion time (see ExtractEnvelope), so it should be
+			// non-negative. A negative value can still occur on the source-time fallback path
+			// (a source clock ahead of the forwarder host) or from residual clock skew, and is
+			// not physically meaningful as pipeline latency. Clamp the latency observation to 0
+			// so it can't drag the pipeline-lag average/min negative, and count the occurrence
+			// separately so the skew stays visible instead of being silently hidden.
+			if lag < 0 {
+				metricRecorder.Count(metrics.Basic.MetricPipelineLagNegative, 1, nil)
+				lag = 0
+			}
+			metricRecorder.Summary(metrics.Basic.MetricPipelineLag, lag, nil)
+		}
+
 		logBytes, err := json.Marshal(logData)
 		if err != nil {
+			metricRecorder.Count(metrics.Advanced.MetricSerializeErrors, 1, nil)
+			// Also counted as dropped -- otherwise it vanishes from loss accounting entirely,
+			// and received == delivered + dropped no longer reconciles.
+			metricRecorder.Count(metrics.Basic.MetricRecordsDropped, 1, map[string]interface{}{"reason": "serialize_error"})
 			log.Warnf("Warning: Could not marshal detailed log for size estimation: %v", err)
 			continue
 		}
 		logSize := len(logBytes)
 
-		// this case handles the case where a single log entry is larger than the maxpayload size.
-		// In this case OCI has a 1MB limit per log line, we try to push this to New Relic anyway
+		// OCI has a 1MB limit per log line; a single entry that alone exceeds maxPayloadSize
+		// is still pushed to New Relic (see below), but flagged here. Checked unconditionally
+		// per record rather than only when a record happens to start a new batch -- otherwise
+		// an oversized record arriving after another batch was already flushed would slip
+		// through uncounted.
+		if logSize > maxPayloadSize {
+			metricRecorder.Count(metrics.Advanced.MetricRecordsOversized, 1, nil)
+		}
+
 		if len(currentBatch) == 0 {
 			currentBatch = common.LogData{logData}
 			currentBatchSize = logSize
-		} else if currentBatchSize+logSize > maxPayloadSize && len(currentBatch) > 0 {
-			util.ProduceMessageToChannel(channel, currentBatch, commonAttributes)
+		} else if currentBatchSize+logSize > maxPayloadSize {
+			// logs[i:] (this record onward) hasn't been batched yet; produceBatch accounts for
+			// it as dropped too if the handoff below fails, alongside the batch it couldn't send.
+			if !produceBatch(ctx, channel, currentBatch, commonAttributes, currentBatchSize, len(logs)-i, metricRecorder) {
+				return
+			}
 			currentBatch = common.LogData{logData}
 			currentBatchSize = logSize
 		} else {
@@ -55,6 +92,28 @@ func splitLogsIntoBatches(logs common.OCILoggingEvent, maxPayloadSize int, commo
 	}
 
 	if len(currentBatch) > 0 {
-		util.ProduceMessageToChannel(channel, currentBatch, commonAttributes)
+		produceBatch(ctx, channel, currentBatch, commonAttributes, currentBatchSize, 0, metricRecorder)
 	}
+}
+
+// produceBatch sends a completed batch to the channel and records its advanced-tier batching
+// metrics. It returns false if ctx is cancelled before the batch could be handed off -- e.g. all
+// consumer workers are stuck on a slow New Relic API call and the channel buffer is full.
+//
+// extraUnbatched is the count of records not yet assigned to any batch (the remainder of the
+// current invocation's input) that are dropped alongside batch if the handoff fails. This is
+// the single place forwarder.records.dropped gets recorded for a producer-cancelled batch --
+// deliberately, so a future second caller of produceBatch can't split the accounting between
+// here and itself and silently under-count (as a caller-side "return false" naturally invites).
+func produceBatch(ctx context.Context, channel chan util.BatchMessage, batch common.LogData, commonAttributes common.LogAttributes, batchSize int, extraUnbatched int, metricRecorder *metrics.Recorder) bool {
+	if !util.ProduceMessageToChannel(ctx, channel, batch, commonAttributes, batchSize) {
+		dropped := len(batch) + extraUnbatched
+		metricRecorder.Count(metrics.Basic.MetricRecordsDropped, float64(dropped), map[string]interface{}{"reason": "producer_cancelled"})
+		log.Warnf("context cancelled while producing log batch; dropped %d log record(s)", dropped)
+		return false
+	}
+
+	metricRecorder.Count(metrics.Advanced.MetricBatchesCreated, 1, nil)
+	metricRecorder.Summary(metrics.Advanced.MetricBatchSizeBytes, float64(batchSize), nil)
+	return true
 }

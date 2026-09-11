@@ -1,0 +1,104 @@
+package metrics
+
+import (
+	"os"
+	"strconv"
+	"sync"
+	"time"
+
+	"github.com/newrelic/newrelic-client-go/v2/pkg/config"
+	nrmetrics "github.com/newrelic/newrelic-client-go/v2/pkg/metrics"
+	"github.com/newrelic/newrelic-client-go/v2/pkg/region"
+
+	"github.com/newrelic/oci-log-integration/logs-function/common"
+	"github.com/newrelic/oci-log-integration/logs-function/logger"
+)
+
+var log = logger.NewLogrusLogger(logger.WithDebugLevel())
+
+// ClientAPI is the subset of newrelic-client-go's Metrics client this package depends on.
+type ClientAPI interface {
+	CreateMetricEntry(metricEntry interface{}) error
+}
+
+// requestTimeout bounds how long the metrics flush can take. It intentionally overrides
+// newrelic-client-go's 30s default: this call happens after log delivery has already
+// finished, at the tail of an OCI Function invocation whose sync timeout is commonly
+// configured at its 300s ceiling with no headroom to spare, so a slow/unresponsive Metric
+// API must not be allowed to eat meaningfully into that budget.
+const requestTimeout = 5 * time.Second
+
+// LicenseKeyFunc supplies the New Relic license key on demand. Kept as a callback (rather
+// than importing util directly) so this package has no dependency on the util package.
+type LicenseKeyFunc func() (string, error)
+
+var (
+	metricsClientCacheMu sync.Mutex
+	cachedClient         ClientAPI
+	cachedClientErr      error
+	clientCachedAt       time.Time
+)
+
+// NewClient returns a TTL-cached New Relic Metrics API client, mirroring the caching
+// pattern already used for the logs client in util.NewNRClient. A cached creation failure
+// is held for only NegativeCacheTTLSeconds (much shorter than the success-case TTL), so a
+// transient failure (bad region, license key fetch error) doesn't silently block the
+// metrics flush for the full window.
+func NewClient(getLicenseKey LicenseKeyFunc) (ClientAPI, error) {
+	metricsClientCacheMu.Lock()
+	defer metricsClientCacheMu.Unlock()
+
+	if !clientCachedAt.IsZero() && time.Since(clientCachedAt) < cacheTTL(cachedClientErr) {
+		return cachedClient, cachedClientErr
+	}
+
+	cachedClient, cachedClientErr = createClient(getLicenseKey)
+	clientCachedAt = time.Now()
+
+	return cachedClient, cachedClientErr
+}
+
+// cacheTTL returns the TTL to apply for the currently cached result: the configured
+// success-case TTL, or the much shorter negative-cache TTL when the cached result is an
+// error -- whichever is smaller, so an explicitly short CLIENT_TTL is still honored.
+func cacheTTL(cachedErr error) time.Duration {
+	ttl := clientTTL()
+	if cachedErr != nil {
+		if negTTL := time.Duration(common.NegativeCacheTTLSeconds) * time.Second; negTTL < ttl {
+			ttl = negTTL
+		}
+	}
+	return ttl
+}
+
+func clientTTL() time.Duration {
+	ttlSeconds := common.DefaultClientTTL
+	if envTTL := os.Getenv(common.ClientTTL); envTTL != "" {
+		if parsed, err := strconv.Atoi(envTTL); err == nil && parsed > 0 {
+			ttlSeconds = parsed
+		}
+	}
+	return time.Duration(ttlSeconds) * time.Second
+}
+
+func createClient(getLicenseKey LicenseKeyFunc) (ClientAPI, error) {
+	nrRegion, err := region.Get(region.Name(os.Getenv(common.NewRelicRegion)))
+	if err != nil {
+		log.Warnf("could not resolve NEW_RELIC_REGION %q, falling back to default region: %v", os.Getenv(common.NewRelicRegion), err)
+	}
+	timeout := requestTimeout
+	cfg := config.Config{Compression: config.Compression.Gzip, Timeout: &timeout}
+
+	if err := cfg.SetRegion(nrRegion); err != nil {
+		return nil, err
+	}
+
+	licenseKey, err := getLicenseKey()
+	if err != nil {
+		return nil, err
+	}
+	cfg.LicenseKey = licenseKey
+
+	client := nrmetrics.New(cfg)
+	return &client, nil
+}
