@@ -22,23 +22,20 @@ type Extraction struct {
 // Extraction (nothing found, nothing to resolve) -- see rules' own doc comment for why there is
 // no fallback guess for an unmatched type.
 func Extract(logData map[string]interface{}) Extraction {
-	logContent, ok := logData["logContent"].(map[string]interface{})
-	if !ok {
-		return Extraction{}
-	}
-
-	logType, _ := logContent["type"].(string)
+	// A record is the CloudEvent itself -- type/data/source/oracle directly at the top level, as
+	// Service Connector Hub actually delivers it. No wrapper to unwrap.
+	logType, _ := logData["type"].(string)
 
 	rule := matchRule(logType)
 	if rule == nil {
 		return Extraction{}
 	}
 
-	ocid := getOCID(logContent, rule.OCIDPath)
+	ocid := getOCID(logData, rule.OCIDPath)
 
 	var name string
 	if rule.NamePath != "" {
-		name, _ = getPath(logContent, rule.NamePath)
+		name, _ = getPath(logData, rule.NamePath)
 	}
 
 	return Extraction{

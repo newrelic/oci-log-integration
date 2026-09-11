@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -191,36 +190,26 @@ func TestResourceNameEnrichmentEnabled(t *testing.T) {
 }
 
 // TestHandleFunctionWithClient_EnrichmentEnabledButClientUnavailable proves the graceful-fallback
-// path: with the flag on, util.NewResourceSearchClient() fails deterministically in this test
-// environment (no real OCI Resource Principal credentials available -- same situation
+// path: util.NewResourceSearchClient() fails deterministically in this test environment (no real
+// OCI Resource Principal credentials available -- same situation
 // util.TestNewResourceSearchClient_CacheExpiration already relies on), and log forwarding must
 // still succeed, with the original record unenriched, rather than blocking or panicking.
 func TestHandleFunctionWithClient_EnrichmentEnabledButClientUnavailable(t *testing.T) {
-	os.Setenv(common.ResourceNameEnrichmentEnabled, "true")
-	defer os.Unsetenv(common.ResourceNameEnrichmentEnabled)
-
 	mockClient := new(MockNewRelicClient)
 	mockClient.On("CreateLogEntry", mock.MatchedBy(func(batch interface{}) bool {
 		detailedBatch, ok := batch.(common.DetailedLogsBatch)
 		if !ok || len(detailedBatch) == 0 || len(detailedBatch[0].Entries) == 0 {
 			return false
 		}
-		logContent, ok := detailedBatch[0].Entries[0]["logContent"].(map[string]interface{})
-		if !ok {
-			return false
-		}
-		data, _ := logContent["data"].(map[string]interface{})
+		data, _ := detailedBatch[0].Entries[0]["data"].(map[string]interface{})
 		_, hasInjectedName := data["logging.oci.displayName"]
 		return !hasInjectedName // the client failed, so enrichment must not have run at all
 	})).Return(nil).Once()
 
 	input := bytes.NewReader([]byte(`[{
-		"logContent": {
-			"type": "com.oraclecloud.vcn.flowlogs.DataEvent",
-			"oracle": {"vnicocid": "ocid1.vnic.oc1.iad.abuwcljrhxeeyawuc5qsdv5opaosn26o5fftjdkdcgaqjn6ka4rqc3wih3bq"},
-			"source": "-",
-			"data": {}
-		}
+		"type": "com.oraclecloud.networkfirewall.traffic",
+		"source": "ocid1.networkfirewall.oc1.iad.abuwcljrhxeeyawuc5qsdv5opaosn26o5fftjdkdcgaqjn6ka4rqc3wih3bq",
+		"data": {"firewall-id": "ocid1.networkfirewall.oc1.iad.abuwcljrhxeeyawuc5qsdv5opaosn26o5fftjdkdcgaqjn6ka4rqc3wih3bq"}
 	}]`))
 	output := &bytes.Buffer{}
 	ctx := context.Background()

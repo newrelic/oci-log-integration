@@ -6,13 +6,13 @@ package resource
 
 import "strings"
 
-// Rule declares, for one OCI log type (or type prefix), where in a record's logContent to find
-// the resource's OCID and, when that type sometimes carries a display name in the payload,
-// where to find that instead of resolving it via Resource Search. Paths are dot-separated and
-// relative to logContent (e.g. "data.gatewayId" means logContent.data.gatewayId) -- every
-// sampled OCI log type nests type/data/oracle/source directly under logContent.
+// Rule declares, for one OCI log type (or type prefix), where in a record to find the resource's
+// OCID and, when that type sometimes carries a display name in the payload, where to find that
+// instead of resolving it via Resource Search. Paths are dot-separated and relative to the record
+// itself (e.g. "data.gatewayId" means record.data.gatewayId) -- every OCI log type nests
+// data/oracle/source directly at the top level.
 type Rule struct {
-	// Type is matched against a record's logContent.type -- exactly, unless PrefixMatch is set.
+	// Type is matched against a record's own type field -- exactly, unless PrefixMatch is set.
 	Type string
 	// PrefixMatch treats Type as a prefix instead of requiring an exact match. Used for log
 	// sources that emit multiple type suffixes sharing the same OCID/name field layout (e.g.

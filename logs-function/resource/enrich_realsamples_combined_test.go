@@ -77,8 +77,7 @@ func TestEnrichRecords_RealSamples_CombinedBatch(t *testing.T) {
 	}
 
 	for i, rec := range records {
-		logContent := logContentOf(t, rec)
-		logType, _ := logContent["type"].(string)
+		logType, _ := rec["type"].(string)
 		data := dataOf(t, rec)
 		// re-derive the OCID from the original payload fields (rules.go's OCIDPath) rather than
 		// from an injected field, since the name-only injection no longer records the OCID itself.

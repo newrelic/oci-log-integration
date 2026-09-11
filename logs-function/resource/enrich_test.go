@@ -33,39 +33,24 @@ func (f *fakeResolver) ResolveMany(ctx context.Context, ocids []string) (map[str
 // build a matched record via a real rule from those two.
 func firewallRecord(firewallOCID string) map[string]interface{} {
 	return map[string]interface{}{
-		"logContent": map[string]interface{}{
-			"type": "com.oraclecloud.networkfirewall.traffic",
-			"data": map[string]interface{}{"firewall-id": firewallOCID},
-		},
+		"type": "com.oraclecloud.networkfirewall.traffic",
+		"data": map[string]interface{}{"firewall-id": firewallOCID},
 	}
 }
 
 func unmatchedVaultRecord() map[string]interface{} {
 	return map[string]interface{}{
-		"logContent": map[string]interface{}{
-			"type": "com.oraclecloud.KeyManagementService.GetVault",
-			"data": map[string]interface{}{
-				"resourceId": "ocid1.vault.oc1.iad.ejurnwh5aabpq.abuwcljsa2gl3wxoj2ftbtwijb64qumg5dj3zbor6oasactkqqcngcjoszra",
-			},
+		"type": "com.oraclecloud.KeyManagementService.GetVault",
+		"data": map[string]interface{}{
+			"resourceId": "ocid1.vault.oc1.iad.ejurnwh5aabpq.abuwcljsa2gl3wxoj2ftbtwijb64qumg5dj3zbor6oasactkqqcngcjoszra",
 		},
 	}
 }
 
 func dataOf(t *testing.T, rec map[string]interface{}) map[string]interface{} {
 	t.Helper()
-	logContent, ok := rec["logContent"].(map[string]interface{})
-	if !ok {
-		return nil
-	}
-	data, _ := logContent["data"].(map[string]interface{})
+	data, _ := rec["data"].(map[string]interface{})
 	return data
-}
-
-// logContentOf returns a record's logContent map.
-func logContentOf(t *testing.T, rec map[string]interface{}) map[string]interface{} {
-	t.Helper()
-	logContent, _ := rec["logContent"].(map[string]interface{})
-	return logContent
 }
 
 func TestEnrichRecords_DedupesBeforeResolve(t *testing.T) {
@@ -92,16 +77,12 @@ func TestEnrichRecords_InjectsResolvedName(t *testing.T) {
 
 func TestEnrichRecords_PartialResolveFailureStillInjectsWhatResolved(t *testing.T) {
 	firewallRec := map[string]interface{}{
-		"logContent": map[string]interface{}{
-			"type": "com.oraclecloud.networkfirewall.traffic",
-			"data": map[string]interface{}{"firewall-id": "ocid1.networkfirewall.oc1.iad.a"},
-		},
+		"type": "com.oraclecloud.networkfirewall.traffic",
+		"data": map[string]interface{}{"firewall-id": "ocid1.networkfirewall.oc1.iad.a"},
 	}
 	dnsRec := map[string]interface{}{
-		"logContent": map[string]interface{}{
-			"type":   "com.oraclecloud.dns.private.resolver",
-			"source": "ocid1.dnsresolver.oc1.iad.b",
-		},
+		"type":   "com.oraclecloud.dns.private.resolver",
+		"source": "ocid1.dnsresolver.oc1.iad.b",
 	}
 	records := common.OCILoggingEvent{firewallRec, dnsRec}
 	// Only the firewall OCID resolves; the resolver also reports an error (e.g. one chunk of a
@@ -146,17 +127,14 @@ func TestEnrichRecords_UnmatchedRecordGetsNoInjectionAtAll(t *testing.T) {
 
 func TestEnrichRecords_RecordWithNoDataMapNeverGetsOneCreated(t *testing.T) {
 	rec := map[string]interface{}{
-		"logContent": map[string]interface{}{
-			"type": "com.oraclecloud.KeyManagementService.GetVault",
-			// deliberately no "data" key at all, unlike unmatchedVaultRecord()
-		},
+		"type": "com.oraclecloud.KeyManagementService.GetVault",
+		// deliberately no "data" key at all, unlike unmatchedVaultRecord()
 	}
 	records := common.OCILoggingEvent{rec}
 
 	EnrichRecords(context.Background(), records, &fakeResolver{})
 
-	logContent := rec["logContent"].(map[string]interface{})
-	_, dataExists := logContent["data"]
+	_, dataExists := rec["data"]
 	assert.False(t, dataExists, "injectResourceName's early return means a data map is never created when there's nothing to write")
 }
 
@@ -164,14 +142,14 @@ func TestResolveTimeout(t *testing.T) {
 	defer os.Unsetenv(common.ResourceResolveTimeoutSeconds)
 
 	os.Unsetenv(common.ResourceResolveTimeoutSeconds)
-	assert.Equal(t, 8, int(resolveTimeout().Seconds()), "default should be DefaultResourceResolveTimeoutSeconds")
+	assert.Equal(t, 10, int(resolveTimeout().Seconds()), "default should be DefaultResourceResolveTimeoutSeconds")
 
 	os.Setenv(common.ResourceResolveTimeoutSeconds, "30")
 	assert.Equal(t, 30, int(resolveTimeout().Seconds()), "a valid override should be honored")
 
 	os.Setenv(common.ResourceResolveTimeoutSeconds, "not-a-number")
-	assert.Equal(t, 8, int(resolveTimeout().Seconds()), "an invalid override should fall back to the default")
+	assert.Equal(t, 10, int(resolveTimeout().Seconds()), "an invalid override should fall back to the default")
 
 	os.Setenv(common.ResourceResolveTimeoutSeconds, "-5")
-	assert.Equal(t, 8, int(resolveTimeout().Seconds()), "a non-positive override should fall back to the default")
+	assert.Equal(t, 10, int(resolveTimeout().Seconds()), "a non-positive override should fall back to the default")
 }

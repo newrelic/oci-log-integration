@@ -137,21 +137,17 @@ func resolveTimeout() time.Duration {
 // appearing as a goldenTag).
 const nameFieldKey = "logging.oci.displayName"
 
-// injectResourceName writes nameFieldKey into logContent.data. A no-op when there's no name.
+// injectResourceName writes nameFieldKey into the record's data object. A no-op when there's no
+// name.
 func injectResourceName(logData map[string]interface{}, name string) {
 	if name == "" {
 		return
 	}
 
-	logContent, ok := logData["logContent"].(map[string]interface{})
-	if !ok {
-		return
-	}
-
-	data, ok := logContent["data"].(map[string]interface{})
+	data, ok := logData["data"].(map[string]interface{})
 	if !ok {
 		data = map[string]interface{}{}
-		logContent["data"] = data
+		logData["data"] = data
 	}
 
 	data[nameFieldKey] = name

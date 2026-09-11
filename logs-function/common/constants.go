@@ -60,18 +60,13 @@ const MaxIdentifiersPerQuery = 20
 // when resolving a batch's distinct missing-name OCIDs.
 const ResourceSearchWorkerPool = 5
 
-// ResourceNameEnrichmentEnabled is the environment variable name that gates the OCID -> resource
-// name enrichment feature. When unset or not "true", none of the enrichment code path runs and
-// log forwarding behaves exactly as it did before this feature existed.
-const ResourceNameEnrichmentEnabled = "RESOURCE_NAME_ENRICHMENT_ENABLED"
-
 // ResourceResolveTimeoutSeconds is the environment variable name for how long, in seconds, a
 // single invocation's resolve-many phase may run before it's abandoned in favor of shipping
 // logs without a resolved name rather than blocking forwarding.
 const ResourceResolveTimeoutSeconds = "RESOURCE_RESOLVE_TIMEOUT_SECONDS"
 
 // DefaultResourceResolveTimeoutSeconds is the default for ResourceResolveTimeoutSeconds.
-const DefaultResourceResolveTimeoutSeconds = 8
+const DefaultResourceResolveTimeoutSeconds = 10
 
 // MaxSearchRetries is how many extra attempts a single Resource Search chunk gets after a
 // retriable (429/5xx) failure, before giving up and letting that chunk's OCIDs ship without a
