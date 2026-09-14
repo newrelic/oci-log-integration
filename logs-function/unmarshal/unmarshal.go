@@ -3,10 +3,12 @@ package unmarshal
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 
 	"github.com/newrelic/oci-log-integration/logs-function/common"
 	"github.com/newrelic/oci-log-integration/logs-function/logger"
+	"github.com/newrelic/oci-log-integration/logs-function/metrics"
 )
 
 // Defines the event types
@@ -22,18 +24,21 @@ type Event struct {
 	OCILoggingEvent common.OCILoggingEvent // OCILoggingEvent represents the Oracle Cloud Infrastructure logging events.
 }
 
-// Unmarshal unmarshals the JSON data into the Event struct.
-func (event *Event) Unmarshal(in io.Reader) error {
+// Unmarshal unmarshals the JSON data into the Event struct. rec may be nil.
+func (event *Event) Unmarshal(in io.Reader, rec *metrics.Recorder) error {
 	payloadBytes, err := io.ReadAll(in)
 	if err != nil {
 		log.Panicf("Error reading incoming payload: %v\n", err)
 	}
+	rec.Count(metrics.Advanced.MetricBytesReceived, float64(len(payloadBytes)), nil)
 
 	var incomingLogEvent common.OCILoggingEvent
 	if err := json.Unmarshal(payloadBytes, &incomingLogEvent); err == nil {
 		event.EventType = OCI_LOGGING
 		event.OCILoggingEvent = incomingLogEvent
+		rec.Count(metrics.Basic.MetricRecordsReceived, float64(len(incomingLogEvent)), nil)
 	} else {
+		rec.Count(metrics.Advanced.MetricDecodeErrors, 1, map[string]interface{}{"error_class": fmt.Sprintf("%T", err)})
 		log.Panicf("Error decoding incoming log events payload: %v", err)
 	}
 
