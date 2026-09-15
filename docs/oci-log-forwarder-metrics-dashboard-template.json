@@ -20,7 +20,7 @@
             "id": "viz.markdown"
           },
           "rawConfiguration": {
-            "text": "# README\n\n## About this page\nThis page displays the **basic-tier** `forwarder.*` custom metrics emitted by the [OCI Log Forwarder](https://github.com/newrelic/oci-log-integration) Function. These metrics are available when `metrics_tier` is set to `basic` or `advanced` in the Terraform configuration.\n\n## How to filter\n1. Select the OCI Function(s) you want to monitor using the **Function Name** variable above.\n2. All charts are faceted by `function_name` and `tenancy_name` so you can correlate metrics across tenancies.\n\n## Metrics on this page\n- **forwarder.invocations** \u2014 one count per function invocation, tagged with `status=success` or `status=error`.\n- **forwarder.records.received** \u2014 total OCI log records received from the incoming event payload.\n- **forwarder.records.delivered** \u2014 records successfully posted to the New Relic Logs API (tagged `status=success`).\n- **forwarder.records.dropped** \u2014 records lost due to a delivery error (tagged `reason=delivery_error`).\n- **forwarder.delivery.duration** \u2014 HTTP round-trip time (seconds) for each New Relic Logs API call, tagged with `status=success` or `status=error`.\n- **forwarder.pipeline.lag** \u2014 time in seconds between the OCI log event timestamp and when the function processed it.\n\n## Common dimensions\nAll metrics carry: `cloud`, `region`, `version`, `function_name`, `application_name`, `tenancy_name`, `compartment_name`.\n\n## Reading blank tiles\n**Record drop rate** divides `dropped` by `received`. Right after a fresh deploy (or any window with zero records received), that division is 0/0 and NRQL returns null, so the tile renders as a dash/no-data instead of `0%` — this means \"no data yet\", not an error or an outage."
+            "text": "# README\n\n## About this page\nThis page displays the **basic-tier** `forwarder.*` custom metrics emitted by the [OCI Log Forwarder](https://github.com/newrelic/oci-log-integration) Function. These metrics are available when `metrics_tier` is set to `basic` or `advanced` in the Terraform configuration.\n\n## How to filter\n1. Select the OCI Function(s) you want to monitor using the **Function Name** variable above.\n2. All charts are faceted by `function_name` and `tenancy_name` so you can correlate metrics across tenancies.\n\n## Metrics on this page\n- **forwarder.invocations** \u2014 one count per function invocation, tagged with `status=success` or `status=error`.\n- **forwarder.records.received** \u2014 total OCI log records received from the incoming event payload.\n- **forwarder.records.delivered** \u2014 records successfully posted to the New Relic Logs API (tagged `status=success`).\n- **forwarder.records.dropped** \u2014 records lost, tagged with `reason`: `delivery_error`, `serialize_error`, or `producer_cancelled`. See the **Records dropped by reason** chart below to break this down.\n- **forwarder.delivery.duration** \u2014 HTTP round-trip time (seconds) for each New Relic Logs API call, tagged with `status=success` or `status=error`.\n- **forwarder.pipeline.lag** \u2014 time in seconds between the OCI log event timestamp and when the function processed it.\n\n## Common dimensions\nAll metrics carry: `cloud`, `region`, `version`, `function_name`, `application_name`, `tenancy_name`, `compartment_name`.\n\n## Reading blank tiles\n**Record drop rate** divides `dropped` by `received`. Right after a fresh deploy (or any window with zero records received), that division is 0/0 and NRQL returns null, so the tile renders as a dash/no-data instead of `0%` — this means \"no data yet\", not an error or an outage."
           }
         },
         {
@@ -42,7 +42,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT latest(version) AS 'Version', latest(cloud) AS 'Cloud', latest(region) AS 'Region', latest(application_name) AS 'Application', latest(compartment_name) AS 'Compartment' FROM Metric WHERE metricName = 'forwarder.invocations' AND function_name IN ({{function_name}}) SINCE 1 hour ago FACET function_name, tenancy_name LIMIT MAX"
               }
@@ -71,7 +71,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT sum(`forwarder.invocations`) AS 'Total', filter(sum(`forwarder.invocations`), WHERE status = 'success') AS 'Success', filter(sum(`forwarder.invocations`), WHERE status = 'error') AS 'Error' FROM Metric WHERE function_name IN ({{function_name}})"
               }
@@ -100,7 +100,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT average(`forwarder.pipeline.lag`) AS 'Avg lag (s)', max(`forwarder.pipeline.lag`) AS 'Max lag (s)' FROM Metric WHERE function_name IN ({{function_name}})"
               }
@@ -151,7 +151,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT rate(sum(`forwarder.records.received`), 1 minute) AS 'records/min' FROM Metric WHERE function_name IN ({{function_name}}) FACET function_name, tenancy_name TIMESERIES MAX"
               }
@@ -189,7 +189,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT rate(sum(`forwarder.records.delivered`), 1 minute) AS 'records/min' FROM Metric WHERE function_name IN ({{function_name}}) FACET function_name, tenancy_name TIMESERIES MAX"
               }
@@ -227,7 +227,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT rate(sum(`forwarder.records.dropped`), 1 minute) AS 'dropped/min' FROM Metric WHERE function_name IN ({{function_name}}) FACET function_name, tenancy_name TIMESERIES MAX"
               }
@@ -281,7 +281,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT sum(`forwarder.invocations`) AS 'invocations' FROM Metric WHERE function_name IN ({{function_name}}) FACET status, function_name TIMESERIES MAX"
               }
@@ -319,7 +319,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT average(`forwarder.delivery.duration`) AS 'avg (s)' FROM Metric WHERE function_name IN ({{function_name}}) FACET status, function_name TIMESERIES MAX"
               }
@@ -357,7 +357,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT sum(`forwarder.records.dropped`) / sum(`forwarder.records.received`) * 100 AS '% dropped' FROM Metric WHERE function_name IN ({{function_name}})"
               }
@@ -415,7 +415,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT average(`forwarder.pipeline.lag`) AS 'avg (s)', max(`forwarder.pipeline.lag`) AS 'max (s)' FROM Metric WHERE function_name IN ({{function_name}}) FACET function_name TIMESERIES MAX"
               }
@@ -456,9 +456,47 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT sum(`forwarder.records.delivered`) AS 'Delivered', sum(`forwarder.records.dropped`) AS 'Dropped' FROM Metric WHERE function_name IN ({{function_name}}) FACET function_name TIMESERIES MAX"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "yAxisLeft": {
+              "zero": true
+            },
+            "yAxisRight": {
+              "zero": true
+            }
+          }
+        },
+        {
+          "title": "Records dropped by reason (per minute)",
+          "layout": {
+            "column": 1,
+            "row": 19,
+            "width": 12,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "facet": {
+              "showOtherSeries": false
+            },
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  YOUR_ACCOUNT_ID
+                ],
+                "query": "SELECT rate(sum(`forwarder.records.dropped`), 1 minute) AS 'dropped/min' FROM Metric WHERE function_name IN ({{function_name}}) FACET reason, function_name TIMESERIES MAX"
               }
             ],
             "platformOptions": {
@@ -516,7 +554,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT rate(sum(`forwarder.bytes.received`), 1 minute) AS 'bytes/min' FROM Metric WHERE function_name IN ({{function_name}}) FACET function_name, tenancy_name TIMESERIES MAX"
               }
@@ -557,7 +595,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT rate(sum(`forwarder.bytes.delivered`), 1 minute) AS 'bytes/min' FROM Metric WHERE function_name IN ({{function_name}}) FACET function_name, tenancy_name TIMESERIES MAX"
               }
@@ -598,7 +636,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT sum(`forwarder.bytes.delivered`) / sum(`forwarder.bytes.received`) * 100 AS 'delivered %' FROM Metric WHERE function_name IN ({{function_name}}) FACET function_name TIMESERIES MAX"
               }
@@ -636,7 +674,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT min(`forwarder.batch.size_bytes`) AS 'min', average(`forwarder.batch.size_bytes`) AS 'avg', max(`forwarder.batch.size_bytes`) AS 'max' FROM Metric WHERE function_name IN ({{function_name}}) FACET function_name TIMESERIES MAX"
               }
@@ -677,7 +715,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT rate(sum(`forwarder.decode.errors`), 1 minute) AS 'errors/min' FROM Metric WHERE function_name IN ({{function_name}}) FACET error_class, function_name TIMESERIES MAX"
               }
@@ -715,7 +753,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT rate(sum(`forwarder.serialize.errors`), 1 minute) AS 'errors/min' FROM Metric WHERE function_name IN ({{function_name}}) FACET function_name TIMESERIES MAX"
               }
@@ -753,7 +791,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT rate(sum(`forwarder.records.oversized`), 1 minute) AS 'oversized/min' FROM Metric WHERE function_name IN ({{function_name}}) FACET function_name TIMESERIES MAX"
               }
@@ -788,7 +826,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT sum(`forwarder.secret.fetch.errors`) AS 'Secret fetch errors' FROM Metric WHERE function_name IN ({{function_name}})"
               }
@@ -842,7 +880,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT rate(sum(`forwarder.batches.created`), 1 minute) AS 'batches/min' FROM Metric WHERE function_name IN ({{function_name}}) FACET function_name, tenancy_name TIMESERIES MAX"
               }
@@ -880,7 +918,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT min(`forwarder.run.duration`) AS 'min (s)', average(`forwarder.run.duration`) AS 'avg (s)', max(`forwarder.run.duration`) AS 'max (s)' FROM Metric WHERE function_name IN ({{function_name}}) FACET function_name TIMESERIES MAX"
               }
@@ -918,7 +956,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT filter(sum(`forwarder.client.cache`), WHERE result = 'hit') / sum(`forwarder.client.cache`) * 100 AS 'cache hit rate %' FROM Metric WHERE function_name IN ({{function_name}})"
               }
@@ -950,7 +988,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT rate(sum(`forwarder.delivery.errors`), 1 minute) AS 'errors/min' FROM Metric WHERE function_name IN ({{function_name}}) FACET error_class, function_name TIMESERIES MAX"
               }
@@ -988,7 +1026,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [
-                  2813435
+                  YOUR_ACCOUNT_ID
                 ],
                 "query": "SELECT sum(`forwarder.client.cache`) AS 'count' FROM Metric WHERE function_name IN ({{function_name}}) FACET result, function_name TIMESERIES MAX"
               }
@@ -1020,7 +1058,7 @@
       ],
       "nrqlQuery": {
         "accountIds": [
-          2813435
+          YOUR_ACCOUNT_ID
         ],
         "query": "SELECT uniques(function_name) FROM Metric WHERE metricName = 'forwarder.invocations'"
       },
