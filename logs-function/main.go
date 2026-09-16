@@ -61,11 +61,14 @@ func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nr
 	case common.OCI_LOGGING:
 		logs := event.OCILoggingEvent
 		if resourceNameEnrichmentEnabled() {
-			if searchClient, err := util.NewResourceSearchClient(); err != nil {
-				log.Errorf("resource search client unavailable, skipping resource name enrichment: %v", err)
-			} else {
-				logs = resource.EnrichRecords(ctx, logs, util.NewResourceSearchResolver(searchClient))
-			}
+			logs = resource.EnrichRecords(ctx, logs, resource.ResolverFunc(func(ctx context.Context, ocids []string) (map[string]string, error) {
+				searchClient, err := util.NewResourceSearchClient()
+				if err != nil {
+					log.Errorf("resource search client unavailable, skipping resource name enrichment: %v", err)
+					return nil, err
+				}
+				return util.NewResourceSearchResolver(searchClient).ResolveMany(ctx, ocids)
+			}))
 		}
 		loggroup.ProcessLogs(logs, channel)
 	default:

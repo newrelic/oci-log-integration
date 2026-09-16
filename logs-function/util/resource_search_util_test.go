@@ -79,6 +79,7 @@ func summaryWithName(identifier, displayName string) resourcesearch.ResourceSumm
 // not the constant, so a future edit that reintroduces a too-large value fails here instead of
 // only failing against live OCI.
 func TestResolveMany_ChunksAtOCILimit(t *testing.T) {
+	resetNameCache()
 	ocids := make([]string, 45) // expect chunks of 20, 20, 5
 	for i := range ocids {
 		ocids[i] = fmt.Sprintf("ocid1.instance.oc1..%d", i)
@@ -105,6 +106,7 @@ func TestResolveMany_ChunksAtOCILimit(t *testing.T) {
 }
 
 func TestResolveMany_AggregatesDisplayNamesAcrossChunks(t *testing.T) {
+	resetNameCache()
 	database := map[string]string{
 		"ocid1.a.oc1..a": "instance-a",
 		"ocid1.b.oc1..b": "instance-b",
@@ -139,6 +141,7 @@ func TestResolveMany_AggregatesDisplayNamesAcrossChunks(t *testing.T) {
 }
 
 func TestResolveMany_DedupesInput(t *testing.T) {
+	resetNameCache()
 	mock := &mockSearchClient{
 		handler: func(_ int, req resourcesearch.SearchResourcesRequest) (resourcesearch.SearchResourcesResponse, error) {
 			return resourcesearch.SearchResourcesResponse{}, nil
@@ -267,6 +270,14 @@ func resetResourceSearchClientCache() {
 	resourceSearchClientCache = time.Time{}
 }
 
+// resetNameCache clears the OCID -> name cache so ResolveMany tests start from a clean slate --
+// nameCache is a package-level var shared across the whole test binary.
+func resetNameCache() {
+	nameCacheMu.Lock()
+	defer nameCacheMu.Unlock()
+	nameCache = map[string]nameCacheEntry{}
+}
+
 // TestNewResourceSearchClient_CacheExpiration mirrors TestNewNRClient_CacheExpiration's intent:
 // no real OCI credentials are available in a test environment, so createResourceSearchClient()
 // deterministically fails here -- the point is verifying the cache mechanism itself (a failure
@@ -336,4 +347,139 @@ func TestResourceSearchCacheTTL(t *testing.T) {
 
 	assert.Equal(t, 600*time.Second, resourceSearchCacheTTL(nil), "a cached success should use the normal client TTL")
 	assert.Equal(t, 30*time.Second, resourceSearchCacheTTL(errors.New("boom")), "a cached failure should use the shorter error TTL")
+}
+
+// --- ResolveMany: OCID -> name cache ---
+
+func TestResolveMany_CachesResolvedNames(t *testing.T) {
+	resetNameCache()
+	mock := &mockSearchClient{
+		handler: func(_ int, _ resourcesearch.SearchResourcesRequest) (resourcesearch.SearchResourcesResponse, error) {
+			return resourcesearch.SearchResourcesResponse{
+				ResourceSummaryCollection: resourcesearch.ResourceSummaryCollection{Items: []resourcesearch.ResourceSummary{summaryWithName("ocid1.a", "instance-a")}},
+			}, nil
+		},
+	}
+	resolver := NewResourceSearchResolver(mock)
+
+	first, err := resolver.ResolveMany(context.Background(), []string{"ocid1.a"})
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]string{"ocid1.a": "instance-a"}, first)
+	assert.Equal(t, 1, mock.callCount(), "first call is a cache miss, so it must hit Resource Search once")
+
+	second, err := resolver.ResolveMany(context.Background(), []string{"ocid1.a"})
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]string{"ocid1.a": "instance-a"}, second, "the cached name should still be returned")
+	assert.Equal(t, 1, mock.callCount(), "a repeat call for an already-resolved OCID should make zero additional SearchResources calls")
+}
+
+func TestResolveMany_CachesNegativeResults(t *testing.T) {
+	resetNameCache()
+	mock := &mockSearchClient{
+		handler: func(_ int, _ resourcesearch.SearchResourcesRequest) (resourcesearch.SearchResourcesResponse, error) {
+			return resourcesearch.SearchResourcesResponse{}, nil // no match for this OCID
+		},
+	}
+	resolver := NewResourceSearchResolver(mock)
+
+	first, err := resolver.ResolveMany(context.Background(), []string{"ocid1.missing"})
+	assert.NoError(t, err)
+	assert.Empty(t, first)
+	assert.Equal(t, 1, mock.callCount())
+
+	second, err := resolver.ResolveMany(context.Background(), []string{"ocid1.missing"})
+	assert.NoError(t, err)
+	assert.Empty(t, second, "a confirmed no-match OCID should stay absent from the result")
+	assert.Equal(t, 1, mock.callCount(), "a repeat call for a confirmed-unresolvable OCID should make zero additional SearchResources calls")
+}
+
+func TestResolveMany_MixedCacheHitAndMiss(t *testing.T) {
+	resetNameCache()
+	mock := &mockSearchClient{
+		handler: func(_ int, req resourcesearch.SearchResourcesRequest) (resourcesearch.SearchResourcesResponse, error) {
+			details := req.SearchDetails.(resourcesearch.StructuredSearchDetails)
+			query := *details.Query
+			var items []resourcesearch.ResourceSummary
+			if strings.Contains(query, "ocid1.a") {
+				items = append(items, summaryWithName("ocid1.a", "instance-a"))
+			}
+			if strings.Contains(query, "ocid1.b") {
+				items = append(items, summaryWithName("ocid1.b", "instance-b"))
+			}
+			return resourcesearch.SearchResourcesResponse{ResourceSummaryCollection: resourcesearch.ResourceSummaryCollection{Items: items}}, nil
+		},
+	}
+	resolver := NewResourceSearchResolver(mock)
+
+	_, err := resolver.ResolveMany(context.Background(), []string{"ocid1.a"})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, mock.callCount())
+
+	resolved, err := resolver.ResolveMany(context.Background(), []string{"ocid1.a", "ocid1.b"})
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]string{"ocid1.a": "instance-a", "ocid1.b": "instance-b"}, resolved)
+	assert.Equal(t, 2, mock.callCount(), "only the uncached OCID should trigger a new SearchResources call")
+	assert.Equal(t, 0, strings.Count(mock.queryOf(1), ","), "the second call's query should only ask about the one uncached OCID")
+	assert.Contains(t, mock.queryOf(1), "ocid1.b")
+	assert.NotContains(t, mock.queryOf(1), "ocid1.a", "the already-cached OCID should not be re-queried")
+}
+
+// TestResolveMany_CacheExpiration mirrors TestNewResourceSearchClient_CacheExpiration's
+// timestamp-rewind trick: simulates TTL expiration by rewinding the cached entry's resolvedAt
+// directly, rather than sleeping.
+func TestResolveMany_CacheExpiration(t *testing.T) {
+	resetNameCache()
+	os.Setenv(common.OCIDNameCacheTTL, "1")
+	defer os.Unsetenv(common.OCIDNameCacheTTL)
+
+	mock := &mockSearchClient{
+		handler: func(_ int, _ resourcesearch.SearchResourcesRequest) (resourcesearch.SearchResourcesResponse, error) {
+			return resourcesearch.SearchResourcesResponse{
+				ResourceSummaryCollection: resourcesearch.ResourceSummaryCollection{Items: []resourcesearch.ResourceSummary{summaryWithName("ocid1.a", "instance-a")}},
+			}, nil
+		},
+	}
+	resolver := NewResourceSearchResolver(mock)
+
+	_, err := resolver.ResolveMany(context.Background(), []string{"ocid1.a"})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, mock.callCount())
+
+	nameCacheMu.Lock()
+	entry := nameCache["ocid1.a"]
+	entry.resolvedAt = time.Now().Add(-2 * time.Second)
+	nameCache["ocid1.a"] = entry
+	nameCacheMu.Unlock()
+
+	_, err = resolver.ResolveMany(context.Background(), []string{"ocid1.a"})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, mock.callCount(), "a call after TTL expiration should re-resolve instead of trusting the stale cache entry")
+}
+
+// TestNameCacheTTL mirrors TestGetResourceSearchErrorTTL's cases for the name-cache TTL.
+func TestNameCacheTTL(t *testing.T) {
+	tests := []struct {
+		name        string
+		envValue    string
+		expectedTTL time.Duration
+	}{
+		{name: "Default TTL when no env var", envValue: "", expectedTTL: 300 * time.Second},
+		{name: "Custom TTL from env var", envValue: "60", expectedTTL: 60 * time.Second},
+		{name: "Invalid TTL falls back to default", envValue: "invalid", expectedTTL: 300 * time.Second},
+		{name: "Zero TTL falls back to default", envValue: "0", expectedTTL: 300 * time.Second},
+		{name: "Negative TTL falls back to default", envValue: "-5", expectedTTL: 300 * time.Second},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envValue != "" {
+				require.NoError(t, os.Setenv(common.OCIDNameCacheTTL, tt.envValue))
+				defer func() { require.NoError(t, os.Unsetenv(common.OCIDNameCacheTTL)) }()
+			} else {
+				require.NoError(t, os.Unsetenv(common.OCIDNameCacheTTL))
+			}
+
+			assert.Equal(t, tt.expectedTTL, nameCacheTTL())
+		})
+	}
 }

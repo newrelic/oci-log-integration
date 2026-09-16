@@ -90,3 +90,14 @@ const OCI_LOGGING = "ociLogging"
 // OCIDPrefix is what every real OCI resource identifier starts with; used to reject look-alike
 // values at a path we'd otherwise treat as an OCID candidate.
 const OCIDPrefix = "ocid1."
+
+// OCIDNameCacheTTL is the environment variable name for how long, in seconds, a resolved
+// OCID -> display name result (including a confirmed "no name found") is reused before
+// Resource Search is asked again for that OCID. This is what makes repeated invocations on a
+// warm container cheap: a Service Connector Hub fires this function repeatedly for the same
+// small set of resources, so without this cache every invocation would re-pay a Resource Search
+// round trip for names already resolved seconds/a batch earlier.
+const OCIDNameCacheTTL = "OCID_NAME_CACHE_TTL"
+
+// DefaultOCIDNameCacheTTL is the default for OCIDNameCacheTTL, in seconds (5 minutes).
+const DefaultOCIDNameCacheTTL = 300

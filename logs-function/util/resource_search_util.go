@@ -98,6 +98,35 @@ func createResourceSearchClient() (ResourceSearchAPI, error) {
 	return &client, nil
 }
 
+// nameCacheEntry is one cached OCID -> display name result. name is intentionally allowed to be
+// empty: a chunk that came back from Resource Search without a match (or without a DisplayName)
+// for a given OCID is just as cacheable as a hit -- otherwise a persistently unresolvable OCID
+// (deleted resource, no read policy, etc.) would pay a fresh Resource Search round trip on every
+// single invocation for as long as the container stays warm.
+type nameCacheEntry struct {
+	name       string
+	resolvedAt time.Time
+}
+
+var (
+	nameCacheMu sync.RWMutex
+	nameCache   = map[string]nameCacheEntry{}
+)
+
+// nameCacheTTL returns how long a cached OCID -> name result is reused, from environment
+// variable or default. Mirrors getResourceSearchErrorTTL's env-parsing shape.
+func nameCacheTTL() time.Duration {
+	ttlSeconds := common.DefaultOCIDNameCacheTTL
+
+	if envTTL := os.Getenv(common.OCIDNameCacheTTL); envTTL != "" {
+		if parsedTTL, err := strconv.Atoi(envTTL); err == nil && parsedTTL > 0 {
+			ttlSeconds = parsedTTL
+		}
+	}
+
+	return time.Duration(ttlSeconds) * time.Second
+}
+
 // ResourceSearchResolver implements resource.Resolver using a live OCI Resource Search client.
 type ResourceSearchResolver struct {
 	client ResourceSearchAPI
@@ -112,27 +141,50 @@ func NewResourceSearchResolver(client ResourceSearchAPI) *ResourceSearchResolver
 }
 
 // ResolveMany implements resource.Resolver: dedupes ocids defensively (EnrichRecords already
-// dedupes via its pending set, but this stays correct standalone), chunks to
-// common.MaxIdentifiersPerQuery (OCI's verified hard limit on an "identifier in (...)" clause),
-// and runs chunks concurrently through a semaphore sized common.ResourceSearchWorkerPool. One
-// chunk's failure is logged and doesn't block the others -- partial results beat none, the same
-// continue-on-error shape ConsumeLogBatches already uses elsewhere in this module. The first
-// error encountered (if any) is still returned so the caller knows resolution was incomplete.
+// dedupes via its pending set, but this stays correct standalone), serves whatever it can from
+// the cache, chunks whatever's left to common.MaxIdentifiersPerQuery (OCI's verified hard limit
+// on an "identifier in (...)" clause), and runs chunks concurrently through a semaphore sized
+// common.ResourceSearchWorkerPool. One chunk's failure is logged and doesn't block the others --
+// partial results beat none, the same continue-on-error shape ConsumeLogBatches already uses
+// elsewhere in this module. The first error encountered (if any) is still returned so the caller
+// knows resolution was incomplete.
 func (r *ResourceSearchResolver) ResolveMany(ctx context.Context, ocids []string) (map[string]string, error) {
 	unique := dedupeOCIDs(ocids)
 
-	var chunks [][]string
-	for i := 0; i < len(unique); i += common.MaxIdentifiersPerQuery {
-		end := i + common.MaxIdentifiersPerQuery
-		if end > len(unique) {
-			end = len(unique)
+	results := make(map[string]string)
+	toResolve := make([]string, 0, len(unique))
+
+	ttl := nameCacheTTL()
+	now := time.Now()
+	nameCacheMu.RLock()
+	for _, ocid := range unique {
+		if entry, ok := nameCache[ocid]; ok && now.Sub(entry.resolvedAt) < ttl {
+			if entry.name != "" {
+				results[ocid] = entry.name
+			}
+			continue
 		}
-		chunks = append(chunks, unique[i:end])
+		toResolve = append(toResolve, ocid)
+	}
+	nameCacheMu.RUnlock()
+
+	log.Debugf("resource search: %d of %d distinct OCID(s) served from cache, %d need a live lookup", len(unique)-len(toResolve), len(unique), len(toResolve))
+
+	if len(toResolve) == 0 {
+		return results, nil
 	}
 
-	log.Debugf("resource search: resolving %d distinct OCID(s) across %d chunk(s), worker pool=%d", len(unique), len(chunks), common.ResourceSearchWorkerPool)
+	var chunks [][]string
+	for i := 0; i < len(toResolve); i += common.MaxIdentifiersPerQuery {
+		end := i + common.MaxIdentifiersPerQuery
+		if end > len(toResolve) {
+			end = len(toResolve)
+		}
+		chunks = append(chunks, toResolve[i:end])
+	}
 
-	results := make(map[string]string)
+	log.Debugf("resource search: resolving %d distinct OCID(s) across %d chunk(s), worker pool=%d", len(toResolve), len(chunks), common.ResourceSearchWorkerPool)
+
 	var (
 		wg        sync.WaitGroup
 		sem       = make(chan struct{}, common.ResourceSearchWorkerPool)
@@ -162,22 +214,32 @@ func (r *ResourceSearchResolver) ResolveMany(ctx context.Context, ocids []string
 				return
 			}
 
-			matched := 0
-			resultsMu.Lock()
+			chunkNames := make(map[string]string, len(chunk))
 			for _, item := range items {
 				if item.Identifier == nil || item.DisplayName == nil || *item.DisplayName == "" {
 					continue
 				}
-				results[*item.Identifier] = *item.DisplayName
-				matched++
+				chunkNames[*item.Identifier] = *item.DisplayName
+			}
+
+			resolvedAt := time.Now()
+			nameCacheMu.Lock()
+			for _, ocid := range chunk {
+				nameCache[ocid] = nameCacheEntry{name: chunkNames[ocid], resolvedAt: resolvedAt}
+			}
+			nameCacheMu.Unlock()
+
+			resultsMu.Lock()
+			for ocid, name := range chunkNames {
+				results[ocid] = name
 			}
 			resultsMu.Unlock()
-			log.Debugf("resource search chunk of %d OCID(s) succeeded in %s, %d resolved with a display name", len(chunk), elapsed, matched)
+			log.Debugf("resource search chunk of %d OCID(s) succeeded in %s, %d resolved with a display name", len(chunk), elapsed, len(chunkNames))
 		}(chunk)
 	}
 
 	wg.Wait()
-	log.Debugf("resource search: resolved %d of %d distinct OCID(s) requested", len(results), len(unique))
+	log.Debugf("resource search: resolved %d of %d distinct OCID(s) requested (cache + live)", len(results), len(unique))
 	return results, firstErr
 }
 

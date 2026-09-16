@@ -22,6 +22,17 @@ type Resolver interface {
 	ResolveMany(ctx context.Context, ocids []string) (map[string]string, error)
 }
 
+// ResolverFunc adapts a plain function to Resolver, the same idiom as http.HandlerFunc. Useful
+// for deferring expensive setup (e.g. constructing a Resource Search client) until ResolveMany is
+// actually invoked -- which EnrichRecords only does once it already knows len(pending) > 0, so a
+// caller passing a ResolverFunc never pays that setup cost for a batch with nothing to resolve.
+type ResolverFunc func(ctx context.Context, ocids []string) (map[string]string, error)
+
+// ResolveMany implements Resolver.
+func (f ResolverFunc) ResolveMany(ctx context.Context, ocids []string) (map[string]string, error) {
+	return f(ctx, ocids)
+}
+
 // EnrichRecords scans records once, resolves every distinct OCID that Extract flagged as
 // NeedsResolve in a single bounded call to resolver, and writes logging.oci.displayName back
 // into each record that ended up with a name. Never called at all when the feature flag is off
