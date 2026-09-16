@@ -6,12 +6,15 @@ package main
 import (
 	"context"
 	"io"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/fnproject/fdk-go"
 	"github.com/newrelic/oci-log-integration/logs-function/common"
 	"github.com/newrelic/oci-log-integration/logs-function/logger"
 	"github.com/newrelic/oci-log-integration/logs-function/loggroup"
+	"github.com/newrelic/oci-log-integration/logs-function/metrics"
 	"github.com/newrelic/oci-log-integration/logs-function/unmarshal"
 	"github.com/newrelic/oci-log-integration/logs-function/util"
 )
@@ -26,39 +29,72 @@ func main() {
 	fdk.Handle(fdk.HandlerFunc(handler))
 }
 
-// handleFunction processes OCI logging events and forwards them to New Relic.
-// It creates the NewRelic client on each invocation (like your working simple function).
+// handleFunction processes OCI logging events and forwards them to New Relic. It also
+// accumulates this invocation's forwarder.* custom metrics and forwards them itself, via
+// the same New Relic client library, right before returning.
 func handleFunction(ctx context.Context, in io.Reader, out io.Writer) {
+	rec := metrics.NewRecorder(commonMetricAttributes())
+
+	// Registered first (so it runs last, after the run-duration summary below is recorded --
+	// defers execute LIFO) to guarantee forwarder.run.duration is in rec before flushMetrics
+	// sends it, no matter how many more defers get added between here and the flush.
+	defer func() {
+		status := "success"
+		panicked := recover()
+		if panicked != nil {
+			status = "error"
+		}
+
+		rec.Count(metrics.Basic.MetricInvocations, 1, map[string]interface{}{"status": status})
+		flushMetrics(rec)
+
+		if panicked != nil {
+			panic(panicked)
+		}
+	}()
+
+	// Started and deferred before the NewNRClient call (rather than after it returns) so that
+	// a cold-cache Vault round-trip is included in forwarder.run.duration, and so the summary
+	// still gets recorded (via panic unwind) even if NewNRClient itself fails and panics below.
+	// Registered second (after the flush defer above) so it runs first, before the flush.
+	runStart := time.Now()
+	defer func() {
+		rec.Summary(metrics.Advanced.MetricRunDuration, time.Since(runStart).Seconds(), nil)
+	}()
+
 	// Create NewRelic client during function invocation, not startup
-	nrClient, err := util.NewNRClient()
+	nrClient, err := util.NewNRClient(rec)
 	if err != nil {
+		// Named/tagged by actual cause (region misconfig vs. Vault/license-key fetch failure)
+		// rather than assuming every NewNRClient failure is a secret-fetch problem.
+		rec.Count(metrics.Advanced.MetricClientInitErrors, 1, map[string]interface{}{"error_class": util.NRClientErrorClass(err)})
 		log.Panicf("error initializing newrelic client: %v", err)
 	}
-	
-	handleFunctionWithClient(ctx, in, out, nrClient)
+
+	handleFunctionWithClient(ctx, in, out, nrClient, rec)
 }
 
 // handleFunctionWithClient processes OCI logging events and forwards them to New Relic.
 // It unmarshals incoming events, starts worker goroutines to process log batches concurrently,
-// and waits for all processing to complete before returning.
-func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nrClient util.NewRelicClientAPI) {
+// and waits for all processing to complete before returning. rec may be nil.
+func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nrClient util.NewRelicClientAPI, rec *metrics.Recorder) {
 	event := unmarshal.Event{}
-	if err := event.Unmarshal(in); err != nil {
+	if err := event.Unmarshal(in, rec); err != nil {
 		log.Panicf("Error unmarshalling event: %v", err)
 	}
 
-	channel := make(chan common.DetailedLogsBatch, common.MessageChannelSize)
+	channel := make(chan util.BatchMessage, common.MessageChannelSize)
 	var wg sync.WaitGroup
 	wg.Add(common.NumberOfWorkers)
 
 	// Start multiple worker goroutines to process log batches concurrently
 	for i := 0; i < common.NumberOfWorkers; i++ {
-		go util.ConsumeLogBatches(ctx, channel, &wg, nrClient)
+		go util.ConsumeLogBatches(ctx, channel, &wg, nrClient, rec)
 	}
 
 	switch event.EventType {
 	case unmarshal.OCI_LOGGING:
-		loggroup.ProcessLogs(event.OCILoggingEvent, channel)
+		loggroup.ProcessLogs(ctx, event.OCILoggingEvent, channel, rec)
 	default:
 		log.Warnf("Unknown event type: %s", event.EventType)
 	}
@@ -67,4 +103,44 @@ func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nr
 	close(channel)
 	// Wait for goroutines to finish processing
 	wg.Wait()
+}
+
+// flushMetrics forwards this invocation's accumulated custom metrics to New Relic's Metric
+// API, reusing the same license key already fetched for the logs client. It runs inside the
+// same deferred block that recovers the handler's own panics, so a failure here must never
+// propagate and mask (or crash on top of) the invocation's real outcome.
+func flushMetrics(rec *metrics.Recorder) {
+	defer func() {
+		if p := recover(); p != nil {
+			log.Errorf("recovered panic while flushing custom metrics: %v", p)
+		}
+	}()
+
+	if rec == nil || rec.Tier() == metrics.TierNone {
+		return
+	}
+
+	client, err := metrics.NewClient(util.GetLicenseKey)
+	if err != nil {
+		log.Warnf("could not initialize metrics client, skipping metrics flush: %v", err)
+		return
+	}
+
+	if err := rec.Flush(client); err != nil {
+		log.Warnf("failed to flush custom metrics: %v", err)
+	}
+}
+
+// commonMetricAttributes returns the dimensions attached to every custom metric this
+// invocation emits.
+func commonMetricAttributes() map[string]interface{} {
+	return map[string]interface{}{
+		"cloud":            common.InstrumentationProvider,
+		"region":           os.Getenv(common.VaultRegion),
+		"version":          common.InstrumentationVersion,
+		"function_name":    os.Getenv(common.FunctionNameEnvVar),
+		"application_name": os.Getenv(common.ApplicationNameEnvVar),
+		"tenancy_name":     os.Getenv(common.TenancyName),
+		"compartment_name": os.Getenv(common.CompartmentName),
+	}
 }

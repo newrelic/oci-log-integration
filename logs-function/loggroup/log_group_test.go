@@ -1,10 +1,15 @@
 package loggroup
 
 import (
+	"context"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/newrelic/oci-log-integration/logs-function/common"
+	"github.com/newrelic/oci-log-integration/logs-function/metrics"
+	"github.com/newrelic/oci-log-integration/logs-function/metrics/metricstest"
+	"github.com/newrelic/oci-log-integration/logs-function/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -80,14 +85,14 @@ func TestProcessLogs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			channel := make(chan common.DetailedLogsBatch, 10)
+			channel := make(chan util.BatchMessage, 10)
 
-			ProcessLogs(tt.ociLoggingEvent, channel)
+			ProcessLogs(context.Background(), tt.ociLoggingEvent, channel, nil)
 
 			close(channel)
 			var batches []common.DetailedLogsBatch
-			for batch := range channel {
-				batches = append(batches, batch)
+			for msg := range channel {
+				batches = append(batches, msg.Batch)
 			}
 
 			assert.Len(t, batches, tt.expectedBatches, "Expected %d batches, got %d", tt.expectedBatches, len(batches))
@@ -182,18 +187,18 @@ func TestSplitLogsIntoBatches(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			channel := make(chan common.DetailedLogsBatch, 10)
+			channel := make(chan util.BatchMessage, 10)
 
 			commonAttributes := common.LogAttributes{
 				"test.attribute": "test.value",
 			}
 
-			splitLogsIntoBatches(tt.logs, tt.maxPayloadSize, commonAttributes, channel)
+			splitLogsIntoBatches(context.Background(), tt.logs, tt.maxPayloadSize, commonAttributes, channel, nil)
 
 			close(channel)
 			var batches []common.DetailedLogsBatch
-			for batch := range channel {
-				batches = append(batches, batch)
+			for msg := range channel {
+				batches = append(batches, msg.Batch)
 			}
 
 			assert.Len(t, batches, tt.expectedBatches, "Expected %d batches, got %d", tt.expectedBatches, len(batches))
@@ -218,23 +223,23 @@ func TestSplitLogsIntoBatchesPayloadSizeAccuracy(t *testing.T) {
 	logs := common.OCILoggingEvent{
 		map[string]interface{}{
 			"msg": "a",
-		}, 
+		},
 		map[string]interface{}{
 			"message": "This is a medium-sized log entry that should fit within reasonable payload limits",
 		},
 	}
 
-	channel := make(chan common.DetailedLogsBatch, 10)
+	channel := make(chan util.BatchMessage, 10)
 	commonAttributes := common.LogAttributes{
 		"test": "value",
 	}
 
-	splitLogsIntoBatches(logs, 50, commonAttributes, channel)
+	splitLogsIntoBatches(context.Background(), logs, 50, commonAttributes, channel, nil)
 
 	close(channel)
 	var batches []common.DetailedLogsBatch
-	for batch := range channel {
-		batches = append(batches, batch)
+	for msg := range channel {
+		batches = append(batches, msg.Batch)
 	}
 
 	assert.Len(t, batches, 2, "Should create 2 batches due to payload size limits")
@@ -255,12 +260,13 @@ func TestProcessLogsWithChannel(t *testing.T) {
 		},
 	}
 
-	channel := make(chan common.DetailedLogsBatch, 5)
+	channel := make(chan util.BatchMessage, 5)
 
-	ProcessLogs(logs, channel)
+	ProcessLogs(context.Background(), logs, channel, nil)
 
 	select {
-	case batch := <-channel:
+	case msg := <-channel:
+		batch := msg.Batch
 		assert.NotEmpty(t, batch, "Should receive a non-empty batch")
 		assert.Len(t, batch, 1, "Batch should contain one DetailedLog")
 
@@ -286,12 +292,13 @@ func TestProcessLogsAttributes(t *testing.T) {
 		},
 	}
 
-	channel := make(chan common.DetailedLogsBatch, 1)
+	channel := make(chan util.BatchMessage, 1)
 
-	ProcessLogs(logs, channel)
+	ProcessLogs(context.Background(), logs, channel, nil)
 
 	close(channel)
-	batch := <-channel
+	msg := <-channel
+	batch := msg.Batch
 
 	assert.Len(t, batch, 1)
 	detailedLog := batch[0]
@@ -309,4 +316,193 @@ func TestProcessLogsAttributes(t *testing.T) {
 	}
 
 	assert.Len(t, detailedLog.CommonData.Attributes, len(expectedAttributes), "Should only have expected attributes")
+}
+
+// TestSplitLogsIntoBatches_PipelineLag verifies forwarder.pipeline.lag is recorded when a
+// record's OCI Logging envelope carries a time field.
+func TestSplitLogsIntoBatches_PipelineLag(t *testing.T) {
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierBasic))
+	defer os.Unsetenv(common.MetricsTier)
+
+	rec := metrics.NewRecorder(nil)
+	channel := make(chan util.BatchMessage, 10)
+
+	logs := common.OCILoggingEvent{
+		map[string]interface{}{
+			"time":    time.Now().Add(-5 * time.Second).UTC().Format(time.RFC3339),
+			"message": "hi",
+		},
+	}
+
+	splitLogsIntoBatches(context.Background(), logs, 1000, common.LogAttributes{}, channel, rec)
+	close(channel)
+	for range channel {
+	}
+
+	names := metricstest.FlushedMetricNames(t, rec)
+	assert.True(t, names["forwarder.pipeline.lag"], "expected forwarder.pipeline.lag to be recorded")
+}
+
+// TestSplitLogsIntoBatches_NegativePipelineLag verifies that when a record's OCI Logging
+// envelope timestamp is ahead of the host clock (negative lag), the latency observation is
+// clamped to 0 and the occurrence is tracked via forwarder.pipeline.lag.negative rather than
+// emitting a physically-meaningless negative pipeline lag.
+func TestSplitLogsIntoBatches_NegativePipelineLag(t *testing.T) {
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierBasic))
+	defer os.Unsetenv(common.MetricsTier)
+
+	rec := metrics.NewRecorder(nil)
+	channel := make(chan util.BatchMessage, 10)
+
+	logs := common.OCILoggingEvent{
+		map[string]interface{}{
+			// Timestamp in the future relative to the host clock -> negative lag.
+			"time":    time.Now().Add(5 * time.Minute).UTC().Format(time.RFC3339),
+			"message": "hi",
+		},
+	}
+
+	splitLogsIntoBatches(context.Background(), logs, 1000, common.LogAttributes{}, channel, rec)
+	close(channel)
+	for range channel {
+	}
+
+	names := metricstest.FlushedMetricNames(t, rec)
+	assert.True(t, names["forwarder.pipeline.lag"], "expected forwarder.pipeline.lag to still be recorded (clamped to 0)")
+	assert.True(t, names["forwarder.pipeline.lag.negative"], "expected forwarder.pipeline.lag.negative to be recorded for negative lag")
+}
+
+// TestSplitLogsIntoBatches_BatchingMetrics verifies forwarder.batches.created and
+// forwarder.batch.size_bytes are recorded when a batch is produced.
+func TestSplitLogsIntoBatches_BatchingMetrics(t *testing.T) {
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierAdvanced))
+	defer os.Unsetenv(common.MetricsTier)
+
+	rec := metrics.NewRecorder(nil)
+	channel := make(chan util.BatchMessage, 10)
+
+	logs := common.OCILoggingEvent{
+		map[string]interface{}{"message": "one"},
+		map[string]interface{}{"message": "two"},
+	}
+
+	splitLogsIntoBatches(context.Background(), logs, 1000, common.LogAttributes{}, channel, rec)
+	close(channel)
+	for range channel {
+	}
+
+	names := metricstest.FlushedMetricNames(t, rec)
+	assert.True(t, names["forwarder.batches.created"])
+	assert.True(t, names["forwarder.batch.size_bytes"])
+}
+
+// TestSplitLogsIntoBatches_RecordsOversized verifies forwarder.records.oversized fires
+// when a single log entry alone exceeds maxPayloadSize.
+func TestSplitLogsIntoBatches_RecordsOversized(t *testing.T) {
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierAdvanced))
+	defer os.Unsetenv(common.MetricsTier)
+
+	rec := metrics.NewRecorder(nil)
+	channel := make(chan util.BatchMessage, 10)
+
+	logs := common.OCILoggingEvent{
+		map[string]interface{}{"message": "this single log entry is deliberately longer than the tiny max payload size configured below"},
+	}
+
+	splitLogsIntoBatches(context.Background(), logs, 10, common.LogAttributes{}, channel, rec)
+	close(channel)
+	for range channel {
+	}
+
+	names := metricstest.FlushedMetricNames(t, rec)
+	assert.True(t, names["forwarder.records.oversized"])
+}
+
+// TestSplitLogsIntoBatches_RecordsOversized_NotFirstInStream verifies
+// forwarder.records.oversized still fires for an oversized record that arrives after an
+// earlier (non-oversized) record already started a batch -- oversized-ness is a per-record
+// property, not something that only gets checked when a record happens to start a batch.
+func TestSplitLogsIntoBatches_RecordsOversized_NotFirstInStream(t *testing.T) {
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierAdvanced))
+	defer os.Unsetenv(common.MetricsTier)
+
+	rec := metrics.NewRecorder(nil)
+	channel := make(chan util.BatchMessage, 10)
+
+	logs := common.OCILoggingEvent{
+		map[string]interface{}{"message": "small"},
+		map[string]interface{}{"message": "this second log entry is deliberately longer than the tiny max payload size configured below"},
+	}
+
+	splitLogsIntoBatches(context.Background(), logs, 30, common.LogAttributes{}, channel, rec)
+	close(channel)
+	for range channel {
+	}
+
+	names := metricstest.FlushedMetricNames(t, rec)
+	assert.True(t, names["forwarder.records.oversized"], "the second, oversized record should still be counted even though it isn't first in the stream")
+}
+
+// TestSplitLogsIntoBatches_SerializeErrors verifies forwarder.serialize.errors fires when
+// a log record can't be marshaled for size estimation, and that the record is also counted
+// in forwarder.records.dropped -- otherwise it vanishes from loss accounting entirely, and
+// received == delivered + dropped no longer reconciles.
+func TestSplitLogsIntoBatches_SerializeErrors(t *testing.T) {
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierAdvanced))
+	defer os.Unsetenv(common.MetricsTier)
+
+	rec := metrics.NewRecorder(nil)
+	channel := make(chan util.BatchMessage, 10)
+
+	logs := common.OCILoggingEvent{
+		map[string]interface{}{"unmarshalable": make(chan int)},
+	}
+
+	splitLogsIntoBatches(context.Background(), logs, 1000, common.LogAttributes{}, channel, rec)
+	close(channel)
+	for range channel {
+	}
+
+	names := metricstest.FlushedMetricNames(t, rec)
+	assert.True(t, names["forwarder.serialize.errors"])
+	assert.True(t, names["forwarder.records.dropped"], "a record that fails to marshal must still be counted as dropped")
+}
+
+// TestSplitLogsIntoBatches_ProducerCancelledDropsUnbatchedRemainder verifies that when
+// produceBatch is called mid-loop (because a new record forced a batch split) and the
+// handoff to the channel fails, forwarder.records.dropped accounts for the failed batch AND
+// every record that hadn't been assigned to a batch yet -- not just the batch itself. This is
+// the exact path previously split between produceBatch and its caller with no test coverage.
+func TestSplitLogsIntoBatches_ProducerCancelledDropsUnbatchedRemainder(t *testing.T) {
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierBasic))
+	defer os.Unsetenv(common.MetricsTier)
+
+	rec := metrics.NewRecorder(nil)
+	channel := make(chan util.BatchMessage) // unbuffered: the mid-loop send below can never succeed on its own
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	// maxPayloadSize=1 forces every record to start a fresh batch, so the second record
+	// triggers produceBatch mid-loop (for the first record's batch) while two more records
+	// (the third and fourth) are still unbatched.
+	logs := common.OCILoggingEvent{
+		map[string]interface{}{"message": "one"},
+		map[string]interface{}{"message": "two"},
+		map[string]interface{}{"message": "three"},
+		map[string]interface{}{"message": "four"},
+	}
+
+	splitLogsIntoBatches(ctx, logs, 1, common.LogAttributes{}, channel, rec)
+
+	payload := metricstest.FlushedPayload(t, rec)
+	metricsList := payload[0]["metrics"].([]map[string]interface{})
+
+	var dropped float64
+	for _, m := range metricsList {
+		if m["name"] == "forwarder.records.dropped" {
+			dropped = m["value"].(float64)
+		}
+	}
+	assert.Equal(t, float64(len(logs)), dropped, "all 4 records (the failed batch plus the unbatched remainder) must be counted as dropped")
 }
