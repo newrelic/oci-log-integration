@@ -61,20 +61,6 @@ var rules = []Rule{
 		OCIDPath:    "source",
 	},
 	{
-		// Events Service rule-execution logs identify the matched rule via data.ruleId, not
-		// data.resourceId like every _Audit-style event -- no generic path can guess this field
-		// name, so it needs an explicit rule. Prefix (still lowercase "eventsservice", so this
-		// stays distinct from the differently-cased com.oraclecloud.EventsService.* audit type,
-		// which is a separate, case-sensitive namespace) so a sibling eventrule log type also
-		// gets a shot at data.ruleId. No NamePath declared: unlike API Gateway/SCH/Functions/etc.,
-		// we don't have this type's own entity-synthesis rule to confirm source
-		// ("poc-reconciler-rule" in the one sample seen) is *always* populated, so it's treated
-		// as needing a resolve rather than assumed safe to skip.
-		Type:        "com.oraclecloud.EventsService.",
-		PrefixMatch: true,
-		OCIDPath:    "data.ruleId",
-	},
-	{
 		// source duplicates the same OCID here (not a name) -- no NamePath, this genuinely
 		// needs a Resource Search resolve.
 		Type:        "com.oraclecloud.goldengate.",

@@ -168,19 +168,16 @@ func TestEnrichRecords_RealSamples(t *testing.T) {
 		dnsOCID      = "ocid1.dnsresolver.oc1.iad.amaaaaaatvlqdbyaf4mgekhmbsvoxvyluwzhowzpdci4rzjrgat6n7z2yj4q"
 		integOCID    = "ocid1.integrationinstance.oc1.iad.amaaaaaatvlqdbyassm3eanvviwuoijb57xkalojoiovyfuu6lslkmx7b6lq"
 		ggOCID       = "ocid1.goldengatedeployment.oc1.iad.amaaaaaaev3nvkqaafhnn35jb6xoomvlfhonb2gqzqb5tpf2h45b62p3gyca"
-		ruleOCID     = "ocid1.eventrule.oc1.iad.amaaaaaatvlqdbyacot7p5fphd6pbcuz3zt2x7jgc4fl7xxqlrhqmoz6gjfq"
 	)
 
 	// One shared resolver, configured with a distinct, made-up name per OCID that genuinely
-	// needs resolving -- distinct on purpose (e.g. "resolved-event-rule-name" rather than
-	// "poc-reconciler-rule") so a test passing can't be confused with the name having leaked in
-	// from source/somewhere else instead of actually coming from the resolver.
+	// needs resolving -- distinct on purpose so a test passing can't be confused with the name
+	// having leaked in from source/somewhere else instead of actually coming from the resolver.
 	resolver := &fakeResolver{resolved: map[string]string{
 		firewallOCID: "resolved-firewall-name",
 		dnsOCID:      "resolved-dns-resolver-name",
 		integOCID:    "resolved-integration-name",
 		ggOCID:       "resolved-goldengate-name",
-		ruleOCID:     "resolved-event-rule-name",
 	}}
 
 	tests := []struct {
@@ -197,7 +194,6 @@ func TestEnrichRecords_RealSamples(t *testing.T) {
 		{name: "GoldenGate -- resolved", raw: sampleGoldenGate, wantName: "resolved-goldengate-name"},
 		{name: "Bastion ListSessions -- unmatched, nothing to inject", raw: sampleBastionListSessions},
 		{name: "Bastion GetBastion -- unmatched, nothing to inject", raw: sampleBastionGetBastion},
-		{name: "Events rule-execution log -- resolved", raw: sampleEventsRuleExecutionLog, wantName: "resolved-event-rule-name"},
 	}
 
 	for _, tt := range tests {
@@ -235,7 +231,6 @@ func TestEnrichRecords_RealSamples_CombinedBatch(t *testing.T) {
 		sampleDNSPrivateResolver,
 		sampleIntegrationActivityStream,
 		sampleGoldenGate,
-		sampleEventsRuleExecutionLog,
 	}
 	combined := "[" + strings.Join(samples, ",") + "]"
 
@@ -248,7 +243,6 @@ func TestEnrichRecords_RealSamples_CombinedBatch(t *testing.T) {
 		dnsOCID      = "ocid1.dnsresolver.oc1.iad.amaaaaaatvlqdbyaf4mgekhmbsvoxvyluwzhowzpdci4rzjrgat6n7z2yj4q"
 		integOCID    = "ocid1.integrationinstance.oc1.iad.amaaaaaatvlqdbyassm3eanvviwuoijb57xkalojoiovyfuu6lslkmx7b6lq"
 		ggOCID       = "ocid1.goldengatedeployment.oc1.iad.amaaaaaaev3nvkqaafhnn35jb6xoomvlfhonb2gqzqb5tpf2h45b62p3gyca"
-		ruleOCID     = "ocid1.eventrule.oc1.iad.amaaaaaatvlqdbyacot7p5fphd6pbcuz3zt2x7jgc4fl7xxqlrhqmoz6gjfq"
 	)
 
 	resolver := &fakeResolver{resolved: map[string]string{
@@ -256,19 +250,18 @@ func TestEnrichRecords_RealSamples_CombinedBatch(t *testing.T) {
 		dnsOCID:      "resolved-dns-resolver-name",
 		integOCID:    "resolved-integration-name",
 		ggOCID:       "resolved-goldengate-name",
-		ruleOCID:     "resolved-event-rule-name",
 	}}
 
 	EnrichRecords(context.Background(), records, resolver)
 
-	// All 5 records (Network Firewall, DNS Private Resolver, Integration Cloud, GoldenGate,
-	// Events rule-execution) match a rule and need a resolve -- exactly one call, exactly 5
-	// distinct OCIDs, across the entire batch.
+	// All 4 records (Network Firewall, DNS Private Resolver, Integration Cloud, GoldenGate)
+	// match a rule and need a resolve -- exactly one call, exactly 4 distinct OCIDs, across the
+	// entire batch.
 	assert.Equal(t, 1, resolver.callCount, "ResolveMany should be called exactly once for the whole batch")
 	assert.ElementsMatch(t,
-		[]string{firewallOCID, dnsOCID, integOCID, ggOCID, ruleOCID},
+		[]string{firewallOCID, dnsOCID, integOCID, ggOCID},
 		resolver.ocidsReceived,
-		"exactly the 5 distinct OCIDs needing resolution, deduped across the whole batch")
+		"exactly the 4 distinct OCIDs needing resolution, deduped across the whole batch")
 
 	// Spot-check every individual record still ended up correct, even mixed into one batch.
 	wantNameForOCID := map[string]string{
@@ -276,7 +269,6 @@ func TestEnrichRecords_RealSamples_CombinedBatch(t *testing.T) {
 		dnsOCID:      "resolved-dns-resolver-name",
 		integOCID:    "resolved-integration-name",
 		ggOCID:       "resolved-goldengate-name",
-		ruleOCID:     "resolved-event-rule-name",
 	}
 
 	for i, rec := range records {

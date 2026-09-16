@@ -388,26 +388,6 @@ const sampleBastionGetBastion = `{
   "type": "com.oraclecloud.bastion.GetBastion"
 }`
 
-const sampleEventsRuleExecutionLog = `{
-  "data": {
-    "eventId": "c7ff46ca-b366-4278-89e7-3c70eb56baa7",
-    "message": "Rule has matched event",
-    "ruleId": "ocid1.eventrule.oc1.iad.amaaaaaatvlqdbyacot7p5fphd6pbcuz3zt2x7jgc4fl7xxqlrhqmoz6gjfq"
-  },
-  "id": "9b410252-ecfa-450d-b9ea-30cd1ca20e38",
-  "oracle": {
-    "compartmentid": "ocid1.tenancy.oc1..aaaaaaaaslaq5synueyzouxaimk3szzf66iw6od7xyiam5myn4lqhcsfu5fq",
-    "ingestedtime": "2026-08-25T17:40:19.154Z",
-    "loggroupid": "ocid1.loggroup.oc1.iad.amaaaaaatvlqdbya5lw7bu2w3tvbdf7kh3de7zlnqbmlnw4t2jgle47rnchq",
-    "logid": "ocid1.log.oc1.iad.amaaaaaatvlqdbyaei2b6awxj7tshbsnkjiosn4npocqgdka5xhvldcryi2q",
-    "tenantid": "ocid1.tenancy.oc1..aaaaaaaaslaq5synueyzouxaimk3szzf66iw6od7xyiam5myn4lqhcsfu5fq"
-  },
-  "source": "poc-reconciler-rule",
-  "specversion": "1.0",
-  "time": "2026-08-25T17:40:12.000Z",
-  "type": "com.oraclecloud.eventsservice.eventrule.ruleexecutionlog"
-}`
-
 // parseSample unmarshals a raw JSON sample the same way unmarshal.go does for a real incoming
 // event -- into a plain map[string]interface{}, one element of common.OCILoggingEvent.
 func parseSample(t *testing.T, raw string) map[string]interface{} {
@@ -481,8 +461,6 @@ func TestExtract_RealSamples_Clean(t *testing.T) {
 // TestExtract_RealSamples_Reconstructed covers the samples that needed reconstruction from a
 // non-JSON paste (see this file's own doc comment above).
 func TestExtract_RealSamples_Reconstructed(t *testing.T) {
-	const ruleOCID = "ocid1.eventrule.oc1.iad.amaaaaaatvlqdbyacot7p5fphd6pbcuz3zt2x7jgc4fl7xxqlrhqmoz6gjfq"
-
 	tests := []struct {
 		name     string
 		raw      string
@@ -497,11 +475,6 @@ func TestExtract_RealSamples_Reconstructed(t *testing.T) {
 			name:     "Bastion GetBastion -- unmatched, excluded, no confirmed entity rule",
 			raw:      sampleBastionGetBastion,
 			expected: Extraction{},
-		},
-		{
-			name:     "Events rule-execution log -- matched, resolves via data.ruleId, source ignored (no NamePath)",
-			raw:      sampleEventsRuleExecutionLog,
-			expected: Extraction{OCID: ruleOCID, NeedsResolve: true},
 		},
 	}
 
