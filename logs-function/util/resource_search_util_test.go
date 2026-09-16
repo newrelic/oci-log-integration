@@ -65,6 +65,21 @@ func (m *mockSearchClient) queryOf(idx int) string {
 	return *details.Query
 }
 
+func (m *mockSearchClient) limitOf(idx int) int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return *m.reqs[idx].Limit
+}
+
+func (m *mockSearchClient) pageOf(idx int) string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.reqs[idx].Page == nil {
+		return ""
+	}
+	return *m.reqs[idx].Page
+}
+
 func summaryWithName(identifier, displayName string) resourcesearch.ResourceSummary {
 	return resourcesearch.ResourceSummary{
 		Identifier:  ociCommon.String(identifier),
@@ -217,6 +232,73 @@ func TestSearchChunk_ContextCancellationDuringBackoffReturnsImmediately(t *testi
 	_, err := resolver.searchChunk(ctx, []string{"ocid1.a"})
 	assert.ErrorIs(t, err, context.Canceled)
 	assert.Equal(t, 1, mock.callCount(), "the first attempt still runs, but the backoff wait before a retry should exit immediately on a cancelled context")
+}
+
+// --- searchChunk: explicit Limit, pagination ---
+
+func TestSearchChunk_SetsExplicitLimit(t *testing.T) {
+	mock := &mockSearchClient{
+		handler: func(_ int, _ resourcesearch.SearchResourcesRequest) (resourcesearch.SearchResourcesResponse, error) {
+			return resourcesearch.SearchResourcesResponse{}, nil
+		},
+	}
+	resolver := NewResourceSearchResolver(mock)
+
+	_, err := resolver.searchChunk(context.Background(), []string{"ocid1.a"})
+	assert.NoError(t, err)
+	assert.Equal(t, common.MaxIdentifiersPerQuery, mock.limitOf(0), "every request should explicitly cap the page size rather than trusting OCI's undocumented default")
+}
+
+func TestSearchChunk_FollowsNextPage(t *testing.T) {
+	mock := &mockSearchClient{
+		handler: func(idx int, _ resourcesearch.SearchResourcesRequest) (resourcesearch.SearchResourcesResponse, error) {
+			if idx == 0 {
+				return resourcesearch.SearchResourcesResponse{
+					ResourceSummaryCollection: resourcesearch.ResourceSummaryCollection{Items: []resourcesearch.ResourceSummary{summaryWithName("ocid1.a", "a")}},
+					OpcNextPage:               ociCommon.String("page2token"),
+				}, nil
+			}
+			return resourcesearch.SearchResourcesResponse{
+				ResourceSummaryCollection: resourcesearch.ResourceSummaryCollection{Items: []resourcesearch.ResourceSummary{summaryWithName("ocid1.b", "b")}},
+			}, nil
+		},
+	}
+	resolver := NewResourceSearchResolver(mock)
+
+	items, err := resolver.searchChunk(context.Background(), []string{"ocid1.a", "ocid1.b"})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, mock.callCount(), "a response carrying OpcNextPage should trigger exactly one follow-up request")
+	assert.Equal(t, "page2token", mock.pageOf(1), "the follow-up request should carry the previous response's OpcNextPage token")
+	assert.Len(t, items, 2, "items from both pages should be combined")
+}
+
+// TestSearchChunk_RetryThenNextPage proves retry and pagination compose correctly: a page that
+// needs a retry still gets fully retried before pagination moves on, and a next page is still
+// followed after a page that only succeeded on retry.
+func TestSearchChunk_RetryThenNextPage(t *testing.T) {
+	mock := &mockSearchClient{
+		handler: func(idx int, _ resourcesearch.SearchResourcesRequest) (resourcesearch.SearchResourcesResponse, error) {
+			switch idx {
+			case 0:
+				return resourcesearch.SearchResourcesResponse{}, fakeServiceError{status: 429}
+			case 1:
+				return resourcesearch.SearchResourcesResponse{
+					ResourceSummaryCollection: resourcesearch.ResourceSummaryCollection{Items: []resourcesearch.ResourceSummary{summaryWithName("ocid1.a", "a")}},
+					OpcNextPage:               ociCommon.String("page2token"),
+				}, nil
+			default:
+				return resourcesearch.SearchResourcesResponse{
+					ResourceSummaryCollection: resourcesearch.ResourceSummaryCollection{Items: []resourcesearch.ResourceSummary{summaryWithName("ocid1.b", "b")}},
+				}, nil
+			}
+		},
+	}
+	resolver := NewResourceSearchResolver(mock)
+
+	items, err := resolver.searchChunk(context.Background(), []string{"ocid1.a", "ocid1.b"})
+	assert.NoError(t, err)
+	assert.Equal(t, 3, mock.callCount(), "one retriable failure, one success carrying a next page, one more success for that page")
+	assert.Len(t, items, 2, "items from the retried page and the follow-up page should both be present")
 }
 
 // --- pure unit tests: isRetriableSearchError, backoffWithJitter, dedupeOCIDs ---

@@ -243,45 +243,74 @@ func (r *ResourceSearchResolver) ResolveMany(ctx context.Context, ocids []string
 	return results, firstErr
 }
 
-// searchChunk resolves at most common.MaxIdentifiersPerQuery OCIDs in a single structured
-// query, retrying with exponential backoff and full jitter on 429/5xx responses. No pagination
-// here (unlike a broad "query all resources" sweep) -- an "identifier in (...)" clause over at
-// most 20 distinct OCIDs can never match more than 20 resources, well under any page-size
-// default, so there's never a next page to follow.
+// searchChunk resolves at most common.MaxIdentifiersPerQuery OCIDs in one or more structured
+// queries. Sets Limit explicitly (rather than trusting OCI's undocumented default page size to
+// happen to cover the chunk) and follows OpcNextPage until exhausted, so this stays correct even
+// if MaxIdentifiersPerQuery is later raised, or a chunk's identifiers happen to match more
+// resources than expected -- no assumption baked in that a chunk always fits on one page.
 func (r *ResourceSearchResolver) searchChunk(ctx context.Context, ocids []string) ([]resourcesearch.ResourceSummary, error) {
 	query := "query all resources where identifier in (" + quotedIdentifierList(ocids) + ")"
-	req := resourcesearch.SearchResourcesRequest{
-		SearchDetails: resourcesearch.StructuredSearchDetails{
-			Query: ociCommon.String(query),
-		},
+
+	var (
+		items []resourcesearch.ResourceSummary
+		page  *string
+	)
+
+	for {
+		req := resourcesearch.SearchResourcesRequest{
+			SearchDetails: resourcesearch.StructuredSearchDetails{
+				Query: ociCommon.String(query),
+			},
+			Limit: ociCommon.Int(common.MaxIdentifiersPerQuery),
+			Page:  page,
+		}
+
+		resp, err := r.fetchPageWithRetry(ctx, req, len(ocids))
+		if err != nil {
+			return nil, err
+		}
+
+		items = append(items, resp.Items...)
+
+		if resp.OpcNextPage == nil || *resp.OpcNextPage == "" {
+			break
+		}
+		page = resp.OpcNextPage
 	}
 
+	return items, nil
+}
+
+// fetchPageWithRetry issues req, retrying with exponential backoff and full jitter on 429/5xx
+// responses, up to common.MaxSearchRetries extra attempts -- the same retry policy searchChunk
+// applied per chunk before pagination support existed, now applied per page.
+func (r *ResourceSearchResolver) fetchPageWithRetry(ctx context.Context, req resourcesearch.SearchResourcesRequest, chunkSize int) (resourcesearch.SearchResourcesResponse, error) {
 	var lastErr error
 	for attempt := 0; attempt <= common.MaxSearchRetries; attempt++ {
 		resp, err := r.client.SearchResources(ctx, req)
 		if err == nil {
-			return resp.Items, nil
+			return resp, nil
 		}
 		lastErr = err
 
 		if !isRetriableSearchError(err) {
-			return nil, err
+			return resourcesearch.SearchResourcesResponse{}, err
 		}
 		if attempt == common.MaxSearchRetries {
 			break
 		}
 
 		delay := backoffWithJitter(attempt)
-		log.Debugf("resource search chunk of %d OCID(s) hit a retriable error (attempt %d/%d), retrying in %s: %v", len(ocids), attempt+1, common.MaxSearchRetries+1, delay, err)
+		log.Debugf("resource search chunk of %d OCID(s) hit a retriable error (attempt %d/%d), retrying in %s: %v", chunkSize, attempt+1, common.MaxSearchRetries+1, delay, err)
 
 		select {
 		case <-time.After(delay):
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return resourcesearch.SearchResourcesResponse{}, ctx.Err()
 		}
 	}
 
-	return nil, fmt.Errorf("resource search failed after %d attempt(s): %w", common.MaxSearchRetries+1, lastErr)
+	return resourcesearch.SearchResourcesResponse{}, fmt.Errorf("resource search failed after %d attempt(s): %w", common.MaxSearchRetries+1, lastErr)
 }
 
 // isRetriableSearchError reports whether err is a transient OCI service error worth retrying --
