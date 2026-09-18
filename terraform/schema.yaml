@@ -15,6 +15,7 @@ variableGroups:
       - ${newrelic_account_id}
       - ${payload_link}
       - ${image_version}
+      - ${metrics_tier}
 
   - title: "Network options"
     variables:
@@ -90,6 +91,24 @@ variables:
     type: string
     required: true
     default: latest
+
+  metrics_tier:
+    type: enum
+    title: "Forwarder metrics tier"
+    description: >
+      Tier of forwarder.* custom metrics the function emits about itself, in addition to
+      New Relic's own ingested logs. "none" emits no custom metrics. "basic" emits core
+      health metrics (invocations, records received/delivered/dropped, delivery duration,
+      pipeline lag). "advanced" adds deeper root-cause/tuning metrics (byte volumes,
+      decode/serialize errors, batching behavior, delivery error classes, run duration,
+      secret-fetch failures, client-cache hit rate). Custom metrics are billed by New
+      Relic on ingest; "none" is the default so this is opt-in.
+    required: true
+    default: "none"
+    enum:
+      - "none"
+      - "basic"
+      - "advanced"
 
   vcnCompartment:
     type: oci:identity:compartment:id
