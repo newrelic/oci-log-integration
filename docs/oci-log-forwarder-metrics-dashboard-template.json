@@ -4,7 +4,7 @@
   "permissions": "PUBLIC_READ_WRITE",
   "pages": [
     {
-      "name": "OCI Forwarder: Basic Metrics",
+      "name": "OCI Forwarder: Health Overview",
       "description": null,
       "widgets": [
         {
@@ -24,7 +24,7 @@
           }
         },
         {
-          "title": "Forwarder info",
+          "title": "Deployment details",
           "layout": {
             "column": 7,
             "row": 1,
@@ -53,7 +53,7 @@
           }
         },
         {
-          "title": "Invocations",
+          "title": "Invocation count",
           "layout": {
             "column": 7,
             "row": 4,
@@ -82,7 +82,7 @@
           }
         },
         {
-          "title": "Avg pipeline lag",
+          "title": "Pipeline lag (avg seconds)",
           "layout": {
             "column": 10,
             "row": 4,
@@ -298,7 +298,7 @@
           }
         },
         {
-          "title": "Delivery duration (avg seconds)",
+          "title": "Delivery duration over time (avg seconds)",
           "layout": {
             "column": 5,
             "row": 12,
@@ -339,7 +339,7 @@
           }
         },
         {
-          "title": "Record drop rate",
+          "title": "Drop rate (%)",
           "layout": {
             "column": 9,
             "row": 12,
@@ -513,7 +513,7 @@
       ]
     },
     {
-      "name": "OCI Forwarder: Advanced Metrics",
+      "name": "OCI Forwarder: Deep Diagnostics",
       "description": null,
       "widgets": [
         {
@@ -615,7 +615,7 @@
           }
         },
         {
-          "title": "Byte delivery ratio over time",
+          "title": "Bytes delivery ratio over time",
           "layout": {
             "column": 5,
             "row": 4,
@@ -653,7 +653,7 @@
           }
         },
         {
-          "title": "Batch size (bytes)",
+          "title": "Batch size over time (bytes)",
           "layout": {
             "column": 9,
             "row": 4,
@@ -808,7 +808,7 @@
           }
         },
         {
-          "title": "Secret fetch errors",
+          "title": "Secret fetch error count",
           "layout": {
             "column": 9,
             "row": 10,
@@ -897,7 +897,7 @@
           }
         },
         {
-          "title": "Run duration (seconds)",
+          "title": "Run duration over time (seconds)",
           "layout": {
             "column": 5,
             "row": 14,
