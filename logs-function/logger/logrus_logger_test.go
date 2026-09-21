@@ -1,9 +1,11 @@
 package logger
 
 import (
-	log "github.com/sirupsen/logrus"
 	"os"
 	"testing"
+
+	"github.com/newrelic/oci-log-integration/logs-function/common"
+	log "github.com/sirupsen/logrus"
 )
 
 // TestWithLogLevel tests the WithLogLevel function of the LogrusLogger.
@@ -46,12 +48,12 @@ func TestWithDebugLevel(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := os.Setenv(DebugEnabled, tc.debugEnabled)
+			err := os.Setenv(common.DebugEnabled, tc.debugEnabled)
 			if err != nil {
 				t.Fatalf("Failed to set environment variable: %v", err)
 			}
 			defer func() {
-				err := os.Unsetenv(DebugEnabled)
+				err := os.Unsetenv(common.DebugEnabled)
 				if err != nil {
 					t.Errorf("Failed to unset environment variable: %v", err)
 				}

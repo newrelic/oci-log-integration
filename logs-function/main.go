@@ -14,6 +14,7 @@ import (
 	"github.com/newrelic/oci-log-integration/logs-function/common"
 	"github.com/newrelic/oci-log-integration/logs-function/logger"
 	"github.com/newrelic/oci-log-integration/logs-function/loggroup"
+	"github.com/newrelic/oci-log-integration/logs-function/resource"
 	"github.com/newrelic/oci-log-integration/logs-function/metrics"
 	"github.com/newrelic/oci-log-integration/logs-function/unmarshal"
 	"github.com/newrelic/oci-log-integration/logs-function/util"
@@ -93,8 +94,19 @@ func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nr
 	}
 
 	switch event.EventType {
-	case unmarshal.OCI_LOGGING:
-		loggroup.ProcessLogs(ctx, event.OCILoggingEvent, channel, rec)
+	case common.OCI_LOGGING:
+		logs := event.OCILoggingEvent
+		if resourceNameEnrichmentEnabled() {
+			logs = resource.EnrichRecords(ctx, logs, resource.ResolverFunc(func(ctx context.Context, ocids []string) (map[string]string, error) {
+				searchClient, err := util.NewResourceSearchClient()
+				if err != nil {
+					log.Errorf("resource search client unavailable, skipping resource name enrichment: %v", err)
+					return nil, err
+				}
+				return util.NewResourceSearchResolver(searchClient).ResolveMany(ctx, ocids)
+			}))
+		}
+		loggroup.ProcessLogs(logs, channel)
 	default:
 		log.Warnf("Unknown event type: %s", event.EventType)
 	}
@@ -105,6 +117,10 @@ func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nr
 	wg.Wait()
 }
 
+// resourceNameEnrichmentEnabled reports whether the OCID -> resource name enrichment feature is
+// turned on. Always on for now.
+func resourceNameEnrichmentEnabled() bool {
+	return true
 // flushMetrics forwards this invocation's accumulated custom metrics to New Relic's Metric
 // API, reusing the same license key already fetched for the logs client. It runs inside the
 // same deferred block that recovers the handler's own panics, so a failure here must never
