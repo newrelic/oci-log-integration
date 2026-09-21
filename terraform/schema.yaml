@@ -95,7 +95,7 @@ variables:
   metrics_tier:
     type: enum
     title: "Forwarder metrics tier"
-    description: Tier of forwarder.* custom metrics the function emits about itself (none/basic/advanced).
+    description: Tier of custom metrics the function emits about itself (none/basic/advanced).
     required: true
     default: "none"
     enum:
