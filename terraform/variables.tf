@@ -64,7 +64,7 @@ variable "image_version" {
 variable "metrics_tier" {
   type        = string
   default     = "none"
-  description = "Tier of forwarder.* custom metrics the function emits about itself (in addition to New Relic's own ingested logs): none (no custom metrics), basic (core health metrics: invocations, records received/delivered/dropped, delivery duration, pipeline lag), or advanced (basic plus deeper root-cause/tuning metrics: byte volumes, decode/serialize errors, batching behavior, delivery error classes, run duration, secret-fetch failures, client-cache hit rate). Custom metrics are billed by New Relic on ingest; none is the default so this is opt-in."
+  description = "Tier of custom metrics the function emits about itself (in addition to New Relic's own ingested logs): none (no custom metrics), basic (core health metrics: invocations, records received/delivered/dropped, delivery duration, pipeline lag), or advanced (basic plus deeper root-cause/tuning metrics: byte volumes, decode/serialize errors, batching behavior, delivery error classes, run duration, secret-fetch failures, client-cache hit rate). Custom metrics are billed by New Relic on ingest; none is the default so this is opt-in."
 
   validation {
     condition     = contains(["none", "basic", "advanced"], var.metrics_tier)
