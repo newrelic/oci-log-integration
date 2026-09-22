@@ -106,7 +106,7 @@ func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nr
 				return util.NewResourceSearchResolver(searchClient).ResolveMany(ctx, ocids)
 			}))
 		}
-		loggroup.ProcessLogs(logs, channel)
+		loggroup.ProcessLogs(ctx, logs, channel, rec)
 	default:
 		log.Warnf("Unknown event type: %s", event.EventType)
 	}
@@ -121,6 +121,8 @@ func handleFunctionWithClient(ctx context.Context, in io.Reader, _ io.Writer, nr
 // turned on. Always on for now.
 func resourceNameEnrichmentEnabled() bool {
 	return true
+}
+
 // flushMetrics forwards this invocation's accumulated custom metrics to New Relic's Metric
 // API, reusing the same license key already fetched for the logs client. It runs inside the
 // same deferred block that recovers the handler's own panics, so a failure here must never
