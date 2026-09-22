@@ -150,6 +150,7 @@ data "oci_core_route_tables" "default_vcn_route_table" {
 # Resource to manage the VCN's default route table and add your rule.
 resource "oci_core_default_route_table" "default_internet_route" {
   manage_default_resource_id = data.oci_core_route_tables.default_vcn_route_table[0].route_tables[0].id
+  count = var.create_vcn ? 1 : 0
   depends_on = [
     module.vcn,
     data.oci_core_route_tables.default_vcn_route_table
