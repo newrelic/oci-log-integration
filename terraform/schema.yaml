@@ -4,7 +4,7 @@ description: >
   Forward logs from OCI Log Groups to New Relic using OCI Functions
   and Service Connector Hub
 schemaVersion: 1.1.0
-version: "1.0.0"
+version: "1.2.0"
 locale: "en"
 variableGroups:
   - title: "New Relic Environment Configuration"
