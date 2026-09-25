@@ -25,11 +25,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
 
+      - name: Read version
+        id: version
+        run: echo "value=$(tr -d '[:space:]' < logs-function/VERSION)" >> "$GITHUB_OUTPUT"
+
       - name: Set permissions for build script
         run: chmod +x scripts/build_image.sh
 
       - name: Build Docker Image
         run: ./scripts/build_image.sh
+        env:
+          IMAGE_TAG: ${{ steps.version.outputs.value }}
 
   push_docker_image:
     runs-on: ubuntu-latest
@@ -83,6 +89,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
 
+      - name: Read version
+        id: version
+        run: echo "value=$(tr -d '[:space:]' < logs-function/VERSION)" >> "$GITHUB_OUTPUT"
+
       - name: Set permissions for build script
         run: chmod +x scripts/build_and_push_image.sh
 
@@ -93,3 +103,4 @@ jobs:
           OCI_REGION: ${{ matrix.region }}
           OCI_TENANCY_NAMESPACE: ${{ secrets.OCI_TENANCY_NAMESPACE }}
           OCI_USERNAME: ${{ secrets.OCI_USERNAME }}
+          IMAGE_TAG: ${{ steps.version.outputs.value }}
