@@ -151,6 +151,8 @@ func flushMetrics(rec *metrics.Recorder) {
 
 // commonMetricAttributes returns the dimensions attached to every custom metric this
 // invocation emits.
+
+// Dummy comment
 func commonMetricAttributes() map[string]interface{} {
 	return map[string]interface{}{
 		"cloud":            common.InstrumentationProvider,
