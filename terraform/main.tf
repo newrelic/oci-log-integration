@@ -9,17 +9,22 @@ terraform {
 }
 
 # Variables
+
+provider "oci" {
+  tenancy_ocid = var.tenancy_ocid
+  region       = var.region
+}
 provider "oci" {
   alias        = "home_provider"
   tenancy_ocid = var.tenancy_ocid
-  region       = var.region
+  region       = local.home_region
 }
 
 # Resource for the logging function application
 resource "oci_functions_application" "logging_function_app" {
   compartment_id = local.compartment_ocid
   config = {
-    "VAULT_REGION"           = var.region
+    "VAULT_REGION"           = local.home_region
     "DEBUG_ENABLED"          = var.debug_enabled
     "SECRET_OCID"            = local.ingest_key_secret_ocid
     "CLIENT_TTL"             = local.client_ttl
@@ -153,7 +158,7 @@ data "oci_core_route_tables" "default_vcn_route_table" {
 # Resource to manage the VCN's default route table and add your rule.
 resource "oci_core_default_route_table" "default_internet_route" {
   manage_default_resource_id = data.oci_core_route_tables.default_vcn_route_table[0].route_tables[0].id
-  count = var.create_vcn ? 1 : 0
+  count                      = var.create_vcn ? 1 : 0
   depends_on = [
     module.vcn,
     data.oci_core_route_tables.default_vcn_route_table
