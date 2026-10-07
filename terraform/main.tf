@@ -70,9 +70,45 @@ resource "oci_logging_log" "function_execution_log" {
   freeform_tags = local.freeform_tags
 }
 
+resource "oci_artifacts_container_repository" "log_forwarder_repo" {
+  compartment_id = local.compartment_ocid
+  display_name   = local.function_image_repository
+  is_public      = false
+  freeform_tags  = local.freeform_tags
+}
+
+resource "oci_identity_auth_token" "registry_push" {
+  count       = local.create_registry_token ? 1 : 0
+  provider    = oci.home_provider
+  user_id     = var.current_user_ocid
+  description = "New Relic logs stack: pushes the function image to ${local.function_image_repository} in ${var.region}"
+}
+
+# Resource Manager has no Docker, so image_mirror.py copies the image over the registry HTTP
+# API. Runs again whenever var.function_image resolves to a new digest.
+resource "null_resource" "mirror_function_image" {
+  triggers = {
+    source_digest = local.function_image_digest
+    destination   = local.function_image
+  }
+
+  provisioner "local-exec" {
+    command = "python ${path.module}/image_mirror.py copy"
+    environment = {
+      SOURCE_IMAGE    = var.function_image
+      SOURCE_DIGEST   = local.function_image_digest
+      DEST_REGISTRY   = local.ocir_host
+      DEST_REPOSITORY = "${local.ocir_namespace}/${local.function_image_repository}"
+      DEST_TAG        = data.external.function_image.result.tag
+      DEST_USERNAME   = local.registry_username
+      DEST_PASSWORD   = local.registry_password
+    }
+  }
+}
+
 # Resource for the function
 resource "oci_functions_function" "logging_function" {
-  depends_on = [oci_functions_application.logging_function_app]
+  depends_on = [oci_functions_application.logging_function_app, null_resource.mirror_function_image]
 
   application_id     = oci_functions_application.logging_function_app.id
   display_name       = local.function_name
@@ -81,7 +117,9 @@ resource "oci_functions_function" "logging_function" {
 
   defined_tags  = {}
   freeform_tags = local.freeform_tags
-  image         = local.image_url
+  image         = local.function_image
+  # Set explicitly: the function stays on the digest it was created with until this changes.
+  image_digest = local.function_image_digest
 }
 
 # Service Connector Hub - Routes logs from multiple log groups to New Relic function
