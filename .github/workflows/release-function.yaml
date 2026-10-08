@@ -6,10 +6,12 @@ on:
       - main
     paths:
       - 'logs-function/**'
+      - 'VERSION'
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - 'logs-function/**'
+      - 'VERSION'
   workflow_dispatch:
 
 permissions:

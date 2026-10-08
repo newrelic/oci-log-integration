@@ -13,6 +13,15 @@ This repository contains integrations to forward logs from Oracle Cloud Infrastr
 
 The log forwarder Function can emit its own custom metrics directly to New Relic's Metric API, in addition to forwarding logs. This is controlled via the `metrics_tier` Terraform variable (`none` / `basic` / `advanced`; default `basic`). `basic` covers core health (record counts, delivery success/loss, delivery latency, pipeline lag); `advanced` adds deeper root-cause/tuning metrics (byte volumes, decode/serialize errors, batching behavior, delivery error classes, run duration, secret-fetch failures, client-cache hit rate) on top of everything in `basic`.
 
+## Versioning and releases
+
+The repository has a single version, stored in the root [`VERSION`](VERSION) file. The function image, the Resource Manager (ORM) template and the GitHub release all use it.
+
+* Every function release publishes two image tags to OCIR in every region: `<VERSION>` (never overwritten once published) and `latest` (moves to the newest release).
+* `image_version` defaults to `latest`. To pin a specific release, set `image_version` to that number (for example `1.3.0`). Pinning also lets you roll back by setting the previous number again.
+* Any change to `logs-function/**` or `terraform/**` that ships to customers must bump `VERSION` (a function-only change is a patch bump) and `version:` in `terraform/schema.yaml`. The `Check Version` workflow fails the pull request if they differ.
+* On merge to `main`, the function image is pushed first. Only after that succeeds is the GitHub release (tag, `oci-log-integration.zip` and notes on whether the function or template changed) created.
+
 ## Contributing
 
 We encourage your contributions to improve oci-log-integration! Keep in mind when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project. If you have any questions, or to execute our corporate CLA, required if your contribution is on behalf of a company, please drop us an email at opensource@newrelic.com.

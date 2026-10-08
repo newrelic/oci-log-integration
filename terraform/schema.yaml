@@ -4,7 +4,7 @@ description: >
   Forward logs from OCI Log Groups to New Relic using OCI Functions
   and Service Connector Hub
 schemaVersion: 1.1.0
-version: "1.2.0"
+version: "1.3.0"
 locale: "en"
 variableGroups:
   - title: "New Relic Environment Configuration"
@@ -87,7 +87,7 @@ variables:
   
   image_version:
     title: Docker Image Version
-    description: Version of the docker image to use
+    description: Version of the docker image to use. Leave as latest to always use the newest release, or set a release number (for example 1.3.0) to pin a specific version.
     type: string
     required: true
     default: latest

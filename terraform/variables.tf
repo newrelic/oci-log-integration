@@ -57,7 +57,7 @@ variable "debug_enabled" {
 
 variable "image_version" {
   type        = string
-  description = "The version of the Docker image for the New Relic function for the region."
+  description = "The version of the Docker image for the New Relic function for the region. Use latest for the newest release, or a release number (for example 1.3.0) to pin a specific version."
   default     = "latest"
 }
 
