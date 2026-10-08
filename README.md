@@ -22,6 +22,17 @@ The repository has a single version, stored in the root [`VERSION`](VERSION) fil
 * Any change to `logs-function/**` or `terraform/**` that ships to customers must bump `VERSION` (a function-only change is a patch bump) and `version:` in `terraform/schema.yaml`. The `Check Version` workflow fails the pull request if they differ.
 * On merge to `main`, the function image is pushed first. Only after that succeeds is the GitHub release (tag, `oci-log-integration.zip` and notes on whether the function or template changed) created.
 
+### Version compatibility
+
+Update this table in the same pull request that bumps `VERSION`.
+
+| Release | Function image tags | Template (ORM) version | Terraform module (`terraform-provider-newrelic`) | Notes |
+|---|---|---|---|---|
+| 1.3.0 | `1.3.0`, `latest` | 1.3.0 | set at the next module release | First release with a pinnable image. |
+| 1.2.0 and earlier | `latest` only | 1.2.0 and earlier | not recorded | No versioned image exists, so these releases cannot be pinned. |
+
+The Terraform module is released separately from this repository, so its column names the module tag that works with that release. Module defaults stay on `image_version = "latest"`.
+
 ## Contributing
 
 We encourage your contributions to improve oci-log-integration! Keep in mind when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project. If you have any questions, or to execute our corporate CLA, required if your contribution is on behalf of a company, please drop us an email at opensource@newrelic.com.
