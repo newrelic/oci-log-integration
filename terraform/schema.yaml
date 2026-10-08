@@ -87,7 +87,7 @@ variables:
   
   image_version:
     title: Docker Image Version
-    description: Version of the docker image to use. Leave as latest to always use the newest release, or set a release number (for example 1.3.0) to pin a specific version.
+    description: Version of the docker image to use
     type: string
     required: true
     default: latest
