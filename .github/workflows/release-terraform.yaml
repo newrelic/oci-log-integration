@@ -1,16 +1,19 @@
 name: Build and Release Terraform Module
 
 on:
-  push:
+  # Run only after the versioned function images are pushed to OCIR, so a
+  # published template never references an image tag that does not exist.
+  workflow_run:
+    workflows: ["Build and Deploy OCI Go Function Image"]
+    types: [completed]
     branches:
       - main
-    paths:
-      - 'terraform/**'
   workflow_dispatch:
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     permissions:
       # Required to create tags and releases
       contents: write
@@ -18,10 +21,21 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          # Build the release from the same commit whose images were pushed.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
 
       - name: Read version
         id: version
-        run: echo "value=$(tr -d '[:space:]' < terraform/VERSION)" >> "$GITHUB_OUTPUT"
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          schema_version="$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' terraform/schema.yaml)"
+          if [ "$version" != "$schema_version" ]; then
+            echo "VERSION ($version) does not match terraform/schema.yaml version ($schema_version)"
+            exit 1
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
 
       - name: Check if release already exists
         id: check
@@ -33,6 +47,24 @@ jobs:
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Work out what changed since the previous release
+        id: changes
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          prev="$(git tag --sort=-v:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
+          function_changed=no
+          template_changed=no
+          if [ -n "$prev" ]; then
+            git diff --quiet "$prev" HEAD -- logs-function || function_changed=yes
+            git diff --quiet "$prev" HEAD -- terraform || template_changed=yes
+          else
+            function_changed=yes
+            template_changed=yes
+          fi
+          echo "prev=${prev:-none}" >> "$GITHUB_OUTPUT"
+          echo "function=$function_changed" >> "$GITHUB_OUTPUT"
+          echo "template=$template_changed" >> "$GITHUB_OUTPUT"
 
       - name: Zip terraform folder
         if: steps.check.outputs.exists == 'false'
@@ -50,7 +82,15 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.value }}
           name: "oci-log-integration ${{ steps.version.outputs.value }}"
-          body: "Static release of the OCI Log Integration Terraform module."
+          body: |
+            Static release of the OCI Log Integration Terraform module.
+
+            - Function image tags: `${{ steps.version.outputs.value }}` and `latest`
+            - Function changed since ${{ steps.changes.outputs.prev }}: ${{ steps.changes.outputs.function }}
+            - Template changed since ${{ steps.changes.outputs.prev }}: ${{ steps.changes.outputs.template }}
+            - Previous release: ${{ steps.changes.outputs.prev }}
+
+            Leave `image_version` as `latest` to always use the newest function, or set it to `${{ steps.version.outputs.value }}` to pin this release.
           files: oci-log-integration.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

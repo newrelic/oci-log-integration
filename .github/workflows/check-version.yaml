@@ -1,0 +1,31 @@
+name: Check Version
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'VERSION'
+      - 'terraform/schema.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check_version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Verify schema.yaml version matches VERSION
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          schema_version="$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' terraform/schema.yaml)"
+          if [ -z "$version" ] || [ "$version" != "$schema_version" ]; then
+            echo "VERSION ($version) does not match terraform/schema.yaml version ($schema_version)"
+            exit 1
+          fi
+          echo "Version $version is consistent."
