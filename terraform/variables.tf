@@ -57,8 +57,33 @@ variable "debug_enabled" {
 
 variable "image_version" {
   type        = string
-  description = "The version of the Docker image for the New Relic function for the region."
+  description = "Deprecated, no longer used. Superseded by function_image, which now carries the full image reference (registry/repository:tag) instead of just a tag applied to a hardcoded New Relic-owned OCIR path."
   default     = "latest"
+}
+
+variable "function_image" {
+  type        = string
+  default     = "docker.io/newrelic/oci-log-forwarder:latest"
+  description = "Public image for the log-forwarder function. The stack copies it into a private Container Registry repository in your tenancy and runs the function from there. Re-applying the stack picks up a new image pushed under the same tag."
+}
+
+variable "current_user_ocid" {
+  type        = string
+  default     = ""
+  description = "OCID of the user running the stack. Populated by Resource Manager; used to create the auth token that pushes the function image to Container Registry."
+}
+
+variable "registry_username" {
+  type        = string
+  default     = ""
+  description = "Container Registry username, without the tenancy namespace. Leave empty to use the user running the stack. Set it for users in a non-default identity domain (/)."
+}
+
+variable "registry_auth_token" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "Existing auth token for pushing to Container Registry. Leave empty to have the stack create one for the user running it (OCI allows two auth tokens per user)."
 }
 
 variable "metrics_tier" {

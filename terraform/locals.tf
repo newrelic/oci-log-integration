@@ -28,7 +28,19 @@ locals {
   function_name       = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function"
   memory_in_mbs       = "128"
   time_out_in_seconds = 300
-  image_url           = "${var.region}.ocir.io/idptojlonu4e/newrelic-logs-integration/oci-log-forwarder:${var.image_version}"
+
+  # The function runs from a copy of var.function_image in the tenancy's own Container
+  # Registry, not from New Relic's own OCIR (the old image_url path this replaces).
+  ocir_host                 = "${var.region}.ocir.io"
+  ocir_namespace            = oci_artifacts_container_repository.log_forwarder_repo.namespace
+  function_image_repository = "newrelic-${var.newrelic_logging_identifier}/oci-log-forwarder"
+  function_image_digest     = data.external.function_image.result.digest
+  function_image            = "${local.ocir_host}/${local.ocir_namespace}/${local.function_image_repository}:${data.external.function_image.result.tag}"
+
+  create_registry_token = nonsensitive(var.registry_auth_token == "")
+  registry_username     = "${local.ocir_namespace}/${var.registry_username != "" ? var.registry_username : data.oci_identity_user.registry_user[0].name}"
+  # Unmarked so Terraform keeps showing the copy's log output; image_mirror.py never prints it.
+  registry_password = local.create_registry_token ? oci_identity_auth_token.registry_push[0].token : nonsensitive(var.registry_auth_token)
 
   # connector hub config
   batch_size_in_kbs = 6000
