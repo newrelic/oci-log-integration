@@ -22,10 +22,10 @@ jobs:
       - name: Read version
         id: version
         run: |
-          version="$(tr -d '[:space:]' < terraform/VERSION)"
-          schema_version="$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' terraform/schema.yaml)"
-          if [ "$version" != "$schema_version" ]; then
-            echo "terraform/VERSION ($version) does not match terraform/schema.yaml version ($schema_version)"
+          # The template version is the top-level `version:` in schema.yaml
+          version="$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' terraform/schema.yaml)"
+          if [ -z "$version" ]; then
+            echo "Could not read the template version from terraform/schema.yaml"
             exit 1
           fi
           echo "value=$version" >> "$GITHUB_OUTPUT"

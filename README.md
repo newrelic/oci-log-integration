@@ -20,10 +20,10 @@ The function and the Resource Manager (ORM) template are versioned and released 
 | Component | Version file | What is released | Release tag |
 |---|---|---|---|
 | Function (Go log forwarder) | [`logs-function/VERSION`](logs-function/VERSION) | Image pushed to OCIR in every region as `<version>` and `latest` | `function-<version>` |
-| Template (ORM stack, `terraform/`) | [`terraform/VERSION`](terraform/VERSION) | `oci-log-integration.zip` | `<version>` |
+| Template (ORM stack, `terraform/`) | `version:` in [`terraform/schema.yaml`](terraform/schema.yaml) | `oci-log-integration.zip` | `<version>` |
 
 * **Function:** any change under `logs-function/**` must bump `logs-function/VERSION`. A `<version>` image tag is never overwritten once published, and `latest` moves to the newest release.
-* **Template:** any change under `terraform/**` that ships to customers must bump `terraform/VERSION` and `version:` in `terraform/schema.yaml`. The `Check Template Version` workflow fails the pull request if they differ.
+* **Template:** any change under `terraform/**` that ships to customers must bump `version:` in `terraform/schema.yaml`. That is the only place the template version is kept, and the release workflow reads it from there.
 * **Default and pinning:** `image_version` defaults to `latest`. To pin a specific function release, set `image_version` to that number (for example `1.3.0`). Pinning also lets you roll back by setting the previous number again.
 * **Mapping:** the template does not reference a function version, so the two do not have to be released together. When a template change needs a newer function (for example a new variable the function must understand), record the minimum function version in the table below in the same pull request.
 
