@@ -29,9 +29,9 @@ The function and the Resource Manager (ORM) template are versioned and released 
 
 ### Version compatibility
 
-| Template (ORM) version | Minimum function version | Terraform module (`terraform-provider-newrelic`) | Notes |
+| Template (ORM) version | Minimum function version | Minimum Terraform provider version (`terraform-provider-newrelic`) | Notes |
 |---|---|---|---|
-| 1.2.0 | any (`latest`) | set at the next module release | Current template. |
+| 1.2.0 | any (`latest`) | v3.99.2 | Current template. v3.99.2 is the first provider release with `metrics_tier`; confirm before relying on it. |
 
 Function releases: `1.3.0` is the first release with a versioned image. Earlier function builds were published as `latest` only, so they cannot be pinned.
 
