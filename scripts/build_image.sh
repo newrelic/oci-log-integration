@@ -3,7 +3,7 @@
 # --- Configuration Variables ---
 
 image_name="${IMAGE_NAME:-oci-log-forwarder}"
-image_tag="${IMAGE_TAG:-$(tr -d '[:space:]' < "$(dirname "$0")/../VERSION")}"
+image_tag="${IMAGE_TAG:-$(tr -d '[:space:]' < "$(dirname "$0")/../logs-function/VERSION")}"
 
 
 echo "--- Starting Docker Image Build ---"

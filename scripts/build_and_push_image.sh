@@ -7,7 +7,7 @@ REGION="$1"
 tenancy_namespace="${OCI_TENANCY_NAMESPACE}"
 repository_name="${REPOSITORY_NAME:-newrelic-logs-integration/oci-log-forwarder}"
 image_name="${IMAGE_NAME:-oci-log-forwarder}"
-image_tag="${IMAGE_TAG:-$(tr -d '[:space:]' < "$(dirname "$0")/../VERSION")}"
+image_tag="${IMAGE_TAG:-$(tr -d '[:space:]' < "$(dirname "$0")/../logs-function/VERSION")}"
 username="${OCI_USERNAME}"
 
 

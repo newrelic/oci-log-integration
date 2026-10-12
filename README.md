@@ -15,23 +15,25 @@ The log forwarder Function can emit its own custom metrics directly to New Relic
 
 ## Versioning and releases
 
-The repository has a single version, stored in the root [`VERSION`](VERSION) file. The function image, the Resource Manager (ORM) template and the GitHub release all use it.
+The function and the Resource Manager (ORM) template are versioned and released independently.
 
-* Every function release publishes two image tags to OCIR in every region: `<VERSION>` (never overwritten once published) and `latest` (moves to the newest release).
-* `image_version` defaults to `latest`. To pin a specific release, set `image_version` to that number (for example `1.3.0`). Pinning also lets you roll back by setting the previous number again.
-* Any change to `logs-function/**` or `terraform/**` that ships to customers must bump `VERSION` (a function-only change is a patch bump) and `version:` in `terraform/schema.yaml`. The `Check Version` workflow fails the pull request if they differ.
-* On merge to `main`, the function image is pushed first. Only after that succeeds is the GitHub release (tag, `oci-log-integration.zip` and notes on whether the function or template changed) created.
+| Component | Version file | What is released | Release tag |
+|---|---|---|---|
+| Function (Go log forwarder) | [`logs-function/VERSION`](logs-function/VERSION) | Image pushed to OCIR in every region as `<version>` and `latest` | `function-<version>` |
+| Template (ORM stack, `terraform/`) | [`terraform/VERSION`](terraform/VERSION) | `oci-log-integration.zip` | `<version>` |
+
+* **Function:** any change under `logs-function/**` must bump `logs-function/VERSION`. A `<version>` image tag is never overwritten once published, and `latest` moves to the newest release.
+* **Template:** any change under `terraform/**` that ships to customers must bump `terraform/VERSION` and `version:` in `terraform/schema.yaml`. The `Check Template Version` workflow fails the pull request if they differ.
+* **Default and pinning:** `image_version` defaults to `latest`. To pin a specific function release, set `image_version` to that number (for example `1.3.0`). Pinning also lets you roll back by setting the previous number again.
+* **Mapping:** the template does not reference a function version, so the two do not have to be released together. When a template change needs a newer function (for example a new variable the function must understand), record the minimum function version in the table below in the same pull request.
 
 ### Version compatibility
 
-Update this table in the same pull request that bumps `VERSION`.
+| Template (ORM) version | Minimum function version | Terraform module (`terraform-provider-newrelic`) | Notes |
+|---|---|---|---|
+| 1.2.0 | any (`latest`) | set at the next module release | Current template. |
 
-| Release | Function image tags | Template (ORM) version | Terraform module (`terraform-provider-newrelic`) | Notes |
-|---|---|---|---|---|
-| 1.3.0 | `1.3.0`, `latest` | 1.3.0 | set at the next module release | First release with a pinnable image. |
-| 1.2.0 and earlier | `latest` only | 1.2.0 and earlier | not recorded | No versioned image exists, so these releases cannot be pinned. |
-
-The Terraform module is released separately from this repository, so its column names the module tag that works with that release. Module defaults stay on `image_version = "latest"`.
+Function releases: `1.3.0` is the first release with a versioned image. Earlier function builds were published as `latest` only, so they cannot be pinned.
 
 ## Contributing
 

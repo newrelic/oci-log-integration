@@ -1,4 +1,4 @@
-name: Check Version
+name: Check Template Version
 
 on:
   pull_request:
@@ -6,8 +6,7 @@ on:
       - main
       - develop
     paths:
-      - 'VERSION'
-      - 'terraform/schema.yaml'
+      - 'terraform/**'
   workflow_dispatch:
 
 permissions:
@@ -20,12 +19,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Verify schema.yaml version matches VERSION
+      - name: Verify schema.yaml version matches terraform/VERSION
         run: |
-          version="$(tr -d '[:space:]' < VERSION)"
+          version="$(tr -d '[:space:]' < terraform/VERSION)"
           schema_version="$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' terraform/schema.yaml)"
           if [ -z "$version" ] || [ "$version" != "$schema_version" ]; then
-            echo "VERSION ($version) does not match terraform/schema.yaml version ($schema_version)"
+            echo "terraform/VERSION ($version) does not match terraform/schema.yaml version ($schema_version)"
             exit 1
           fi
-          echo "Version $version is consistent."
+          echo "Template version $version is consistent."
