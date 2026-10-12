@@ -13,6 +13,14 @@ This repository contains integrations to forward logs from Oracle Cloud Infrastr
 
 The log forwarder Function can emit its own custom metrics directly to New Relic's Metric API, in addition to forwarding logs. This is controlled via the `metrics_tier` Terraform variable (`none` / `basic` / `advanced`; default `basic`). `basic` covers core health (record counts, delivery success/loss, delivery latency, pipeline lag); `advanced` adds deeper root-cause/tuning metrics (byte volumes, decode/serialize errors, batching behavior, delivery error classes, run duration, secret-fetch failures, client-cache hit rate) on top of everything in `basic`.
 
+## Entity synthesis name enrichment
+
+The log forwarder resolves the OCID embedded in a log record to its human-readable OCI display name via OCI Resource Search, and injects it as `logging.oci.displayName` on the record. This feeds entity synthesis downstream — synthesized OCI entities get a real name instead of a raw OCID.
+
+Currently covers 4 log types via prefix-matched rules: Network Firewall, DNS Private Resolver, Integration, and GoldenGate. There's deliberately no rule for Queue, Streaming, or API Gateway — their logs already carry a native display name in the payload, so a Resource Search lookup would be redundant. This is always on; there's no opt-out variable.
+
+Resolution is batched per invocation: every record is scanned once, the distinct OCIDs needing a lookup are deduped across the whole batch, chunked to Resource Search's 20-OCID-per-query limit, and resolved concurrently with retry on transient failures. A partial failure doesn't block forwarding — unresolved records just go out without a name.
+
 ## Image hosting and versioning
 
 The log-forwarder function image is published to Docker Hub (`docker.io/newrelic/oci-log-forwarder`). At apply time, the stack copies it into a private Container Registry repository in your own tenancy and runs the Function from that copy — your tenancy never pulls directly from Docker Hub at runtime, only during `apply`.
