@@ -25,7 +25,7 @@ The function and the Resource Manager (ORM) template are versioned and released 
 * **Function:** any change under `logs-function/**` must bump `logs-function/VERSION`. A `<version>` image tag is never overwritten once published, and `latest` moves to the newest release.
 * **Template:** any change under `terraform/**` that ships to customers must bump `version:` in `terraform/schema.yaml`. That is the only place the template version is kept, and the release workflow reads it from there.
 * **Default and pinning:** `image_version` defaults to `latest`. To pin a specific function release, set `image_version` to that number (for example `1.3.0`). Pinning also lets you roll back by setting the previous number again.
-* **Mapping:** the template does not reference a function version, so the two do not have to be released together. When a template change needs a newer function (for example a new variable the function must understand), record the minimum function version in the table below in the same pull request.
+* **Mapping:** the template does not reference a function version, so the two do not have to be released together. When a template change needs a newer function (for example a new variable the function must understand) or a newer Terraform provider, record the minimum versions in the table below in the same pull request.
 
 ### Version compatibility
 
@@ -33,7 +33,7 @@ The function and the Resource Manager (ORM) template are versioned and released 
 |---|---|---|---|
 | 1.2.0 | any (`latest`) | v3.99.2 | Current template. v3.99.2 is the first provider release with `metrics_tier`; confirm before relying on it. |
 
-Function releases: `1.3.0` is the first release with a versioned image. Earlier function builds were published as `latest` only, so they cannot be pinned.
+There is no backward compatibility: past releases are not given versions. Versioning starts with function `1.3.0`, and from here on we only add new versions. Earlier function builds were published as `latest` only, so they cannot be pinned.
 
 ## Contributing
 
