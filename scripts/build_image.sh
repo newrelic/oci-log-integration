@@ -3,7 +3,12 @@
 # --- Configuration Variables ---
 
 image_name="${IMAGE_NAME:-oci-log-forwarder}"
-image_tag="${IMAGE_TAG:-$(tr -d '[:space:]' < "$(dirname "$0")/../logs-function/VERSION")}"
+image_tag="${IMAGE_TAG:-$(tr -d '[:space:]' < "$(dirname "$0")/../logs-function/VERSION" 2>/dev/null)}"
+
+if [ -z "${image_tag}" ]; then
+  echo "Error: could not read the function version from logs-function/VERSION."
+  exit 1
+fi
 
 
 echo "--- Starting Docker Image Build ---"
