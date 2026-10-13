@@ -15,9 +15,9 @@ The log forwarder Function can emit its own custom metrics directly to New Relic
 
 ## Entity synthesis name enrichment
 
-The log forwarder resolves the OCID embedded in a log record to its human-readable OCI display name via OCI Resource Search, and injects it as `logging.oci.displayName` on the record. This feeds entity synthesis downstream — synthesized OCI entities get a real name instead of a raw OCID.
+The log forwarder resolves the OCID embedded in a log record to its human-readable OCI display name via OCI Resource Search, and injects it as `logging.oci.displayName` on the record. This field is consumed by entity synthesis and dropped by the platform afterward — it doesn't persist on the customer-visible log record in NRDB.
 
-Currently covers 4 log types via prefix-matched rules: Network Firewall, DNS Private Resolver, Integration, and GoldenGate. There's deliberately no rule for Queue, Streaming, or API Gateway — their logs already carry a native display name in the payload, so a Resource Search lookup would be redundant. This is always on; there's no opt-out variable.
+Covers 4 log types via prefix-matched rules: Network Firewall, DNS Private Resolver, Integration, and GoldenGate. Entity synthesis rules exist for every OCI log-based entity type, including Queue, Streaming, and API Gateway — those three just resolve their name from a field already native to the payload (e.g. `data.gatewayDisplayName`, `source`) instead of this synthetic field, so a Resource Search lookup isn't needed for them. This is always on; there's no opt-out variable.
 
 Resolution is batched per invocation: every record is scanned once, the distinct OCIDs needing a lookup are deduped across the whole batch, chunked to Resource Search's 20-OCID-per-query limit, and resolved concurrently with retry on transient failures. A partial failure doesn't block forwarding — unresolved records just go out without a name.
 
