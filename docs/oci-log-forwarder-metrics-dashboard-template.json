@@ -20,7 +20,7 @@
             "id": "viz.markdown"
           },
           "rawConfiguration": {
-            "text": "# README\n\n## About this page\nThis page displays the **basic-tier** `forwarder.*` custom metrics emitted by the [OCI Log Forwarder](https://github.com/newrelic/oci-log-integration) Function. These metrics are available when `metrics_tier` is set to `basic` or `advanced` in the Terraform configuration.\n\n## How to filter\n1. Select the OCI Function(s) you want to monitor using the **Function Name** variable above.\n2. All charts are faceted by `function_name` and `tenancy_name` so you can correlate metrics across tenancies.\n\n## Metrics on this page\n- **forwarder.invocations** \u2014 one count per function invocation, tagged with `status=success` or `status=error`.\n- **forwarder.records.received** \u2014 total OCI log records received from the incoming event payload.\n- **forwarder.records.delivered** \u2014 records successfully posted to the New Relic Logs API (tagged `status=success`).\n- **forwarder.records.dropped** \u2014 records lost, tagged with `reason`: `delivery_error`, `serialize_error`, or `producer_cancelled`. See the **Records dropped by reason** chart below to break this down.\n- **forwarder.delivery.duration** \u2014 HTTP round-trip time (seconds) for each New Relic Logs API call, tagged with `status=success` or `status=error`.\n- **forwarder.pipeline.lag** \u2014 time in seconds between the OCI log event timestamp and when the function processed it.\n\n## Common dimensions\nAll metrics carry: `cloud`, `region`, `version`, `function_name`, `application_name`, `tenancy_name`, `compartment_name`.\n\n## Reading blank tiles\n**Record drop rate** divides `dropped` by `received`. Right after a fresh deploy (or any window with zero records received), that division is 0/0 and NRQL returns null, so the tile renders as a dash/no-data instead of `0%` — this means \"no data yet\", not an error or an outage."
+            "text": "# README\n\n## About this page\nThis page displays the **basic-tier** `forwarder.*` custom metrics emitted by the [OCI Log Forwarder](https://github.com/newrelic/oci-log-integration) Function. These metrics are available when `metrics_tier` is set to `basic` or `advanced` in the Terraform configuration.\n\n## How to filter\n1. Select the OCI Function(s) you want to monitor using the **Function Name** variable above.\n2. All charts are faceted by `function_name` and `tenancy_name` so you can correlate metrics across tenancies.\n\n## Metrics on this page\n- **forwarder.invocations** \u2014 one count per function invocation, tagged with `status=success` or `status=error`.\n- **forwarder.records.received** \u2014 total OCI log records received from the incoming event payload.\n- **forwarder.records.delivered** \u2014 records successfully posted to the New Relic Logs API (tagged `status=success`).\n- **forwarder.records.dropped** \u2014 records lost, tagged with `reason`: `delivery_error`, or `producer_cancelled`. See the **Records dropped by reason** chart below to break this down.\n- **forwarder.delivery.duration** \u2014 HTTP round-trip time (seconds) for each New Relic Logs API call, tagged with `status=success` or `status=error`.\n- **forwarder.pipeline.lag** \u2014 time in seconds between the OCI log event timestamp and when the function processed it.\n\n## Common dimensions\nAll metrics carry: `cloud`, `region`, `version`, `function_name`, `application_name`, `tenancy_name`, `compartment_name`.\n\n## Reading blank tiles\n**Record drop rate** divides `dropped` by `received`. Right after a fresh deploy (or any window with zero records received), that division is 0/0 and NRQL returns null, so the tile renders as a dash/no-data instead of `0%` — this means \"no data yet\", not an error or an outage."
           }
         },
         {
@@ -529,7 +529,7 @@
             "id": "viz.markdown"
           },
           "rawConfiguration": {
-            "text": "# README\n\n## About this page\nThis page displays the **advanced-tier** `forwarder.*` custom metrics emitted by the [OCI Log Forwarder](https://github.com/newrelic/oci-log-integration) Function. These metrics are **in addition** to the basic-tier metrics shown on the previous page. They are available when `metrics_tier = advanced` in the Terraform configuration.\n\n## Metrics on this page\n\n### Byte volumes\n- **forwarder.bytes.received** \u2014 raw payload bytes read from the OCI invocation input.\n- **forwarder.bytes.delivered** \u2014 bytes sent to the New Relic Logs API per successful batch.\n\n### Errors\n- **forwarder.decode.errors** \u2014 failures to JSON-decode the incoming OCI event payload (tagged with `error_class`).\n- **forwarder.serialize.errors** \u2014 failures to JSON-marshal individual log entries during batch assembly.\n- **forwarder.records.oversized** \u2014 records that individually exceed the New Relic 1 MB payload limit.\n- **forwarder.delivery.errors** \u2014 delivery errors tagged with `error_class` and `status=error`.\n- **forwarder.secret.fetch.errors** \u2014 failures to fetch the New Relic license key from OCI Vault.\n\n### Batching & performance\n- **forwarder.batches.created** \u2014 number of batches assembled per invocation.\n- **forwarder.batch.size_bytes** \u2014 distribution of batch sizes in bytes (min/avg/max per invocation).\n- **forwarder.run.duration** \u2014 total function run time in seconds (excluding the metrics flush itself).\n\n### Client cache\n- **forwarder.client.cache** \u2014 New Relic client cache outcome tagged with `result=hit` or `result=miss`.\n\n## Reading blank tiles\n**Byte delivery ratio** and **Client cache hit rate** both divide one sum by another. If the denominator is 0 (no bytes received yet, or a cold cache with zero cache lookups), NRQL returns null rather than `0%`, so the tile/line goes blank instead of showing a healthy zero. Check the underlying `forwarder.bytes.received` / `forwarder.client.cache` counts before assuming the widget is broken."
+            "text": "# README\n\n## About this page\nThis page displays the **advanced-tier** `forwarder.*` custom metrics emitted by the [OCI Log Forwarder](https://github.com/newrelic/oci-log-integration) Function. These metrics are **in addition** to the basic-tier metrics shown on the previous page. They are available when `metrics_tier = advanced` in the Terraform configuration.\n\n## Metrics on this page\n\n### Byte volumes\n- **forwarder.bytes.received** \u2014 raw payload bytes read from the OCI invocation input.\n- **forwarder.bytes.delivered** \u2014 bytes sent to the New Relic Logs API per successful batch.\n\n### Errors\n- **forwarder.records.oversized** \u2014 records that individually exceed the New Relic 1 MB payload limit.\n- **forwarder.delivery.errors** \u2014 delivery errors tagged with `error_class` and `status=error`.\n- **forwarder.secret.fetch.errors** \u2014 failures to fetch the New Relic license key from OCI Vault.\n\n### Batching & performance\n- **forwarder.batches.created** \u2014 number of batches assembled per invocation.\n- **forwarder.batch.size_bytes** \u2014 distribution of batch sizes in bytes (min/avg/max per invocation).\n- **forwarder.run.duration** \u2014 total function run time in seconds (excluding the metrics flush itself).\n\n### Client cache\n- **forwarder.client.cache** \u2014 New Relic client cache outcome tagged with `result=hit` or `result=miss`.\n\n## Reading blank tiles\n**Byte delivery ratio** and **Client cache hit rate** both divide one sum by another. If the denominator is 0 (no bytes received yet, or a cold cache with zero cache lookups), NRQL returns null rather than `0%`, so the tile/line goes blank instead of showing a healthy zero. Check the underlying `forwarder.bytes.received` / `forwarder.client.cache` counts before assuming the widget is broken."
           }
         },
         {
@@ -694,86 +694,10 @@
           }
         },
         {
-          "title": "Decode errors (per minute)",
-          "layout": {
-            "column": 5,
-            "row": 7,
-            "width": 4,
-            "height": 3
-          },
-          "linkedEntityGuids": null,
-          "visualization": {
-            "id": "viz.line"
-          },
-          "rawConfiguration": {
-            "facet": {
-              "showOtherSeries": false
-            },
-            "legend": {
-              "enabled": true
-            },
-            "nrqlQueries": [
-              {
-                "accountIds": [
-                  YOUR_ACCOUNT_ID
-                ],
-                "query": "SELECT rate(sum(`forwarder.decode.errors`), 1 minute) AS 'errors/min' FROM Metric WHERE function_name IN ({{function_name}}) FACET error_class, function_name TIMESERIES MAX"
-              }
-            ],
-            "platformOptions": {
-              "ignoreTimeRange": false
-            },
-            "yAxisLeft": {
-              "zero": true
-            },
-            "yAxisRight": {
-              "zero": true
-            }
-          }
-        },
-        {
-          "title": "Serialize errors (per minute)",
-          "layout": {
-            "column": 9,
-            "row": 7,
-            "width": 4,
-            "height": 3
-          },
-          "linkedEntityGuids": null,
-          "visualization": {
-            "id": "viz.line"
-          },
-          "rawConfiguration": {
-            "facet": {
-              "showOtherSeries": false
-            },
-            "legend": {
-              "enabled": true
-            },
-            "nrqlQueries": [
-              {
-                "accountIds": [
-                  YOUR_ACCOUNT_ID
-                ],
-                "query": "SELECT rate(sum(`forwarder.serialize.errors`), 1 minute) AS 'errors/min' FROM Metric WHERE function_name IN ({{function_name}}) FACET function_name TIMESERIES MAX"
-              }
-            ],
-            "platformOptions": {
-              "ignoreTimeRange": false
-            },
-            "yAxisLeft": {
-              "zero": true
-            },
-            "yAxisRight": {
-              "zero": true
-            }
-          }
-        },
-        {
           "title": "Oversized records (per minute)",
           "layout": {
             "column": 5,
-            "row": 10,
+            "row": 7,
             "width": 4,
             "height": 3
           },
@@ -811,7 +735,7 @@
           "title": "Secret fetch error count",
           "layout": {
             "column": 9,
-            "row": 10,
+            "row": 7,
             "width": 4,
             "height": 3
           },
@@ -846,7 +770,7 @@
           "title": "",
           "layout": {
             "column": 1,
-            "row": 13,
+            "row": 10,
             "width": 12,
             "height": 1
           },
@@ -862,7 +786,7 @@
           "title": "Batches created (per minute)",
           "layout": {
             "column": 1,
-            "row": 14,
+            "row": 11,
             "width": 4,
             "height": 3
           },
@@ -900,7 +824,7 @@
           "title": "Run duration over time (seconds)",
           "layout": {
             "column": 5,
-            "row": 14,
+            "row": 11,
             "width": 4,
             "height": 3
           },
@@ -941,7 +865,7 @@
           "title": "Client cache hit rate",
           "layout": {
             "column": 9,
-            "row": 14,
+            "row": 11,
             "width": 4,
             "height": 3
           },
@@ -970,7 +894,7 @@
           "title": "Delivery errors by class (per minute)",
           "layout": {
             "column": 1,
-            "row": 17,
+            "row": 14,
             "width": 6,
             "height": 3
           },
@@ -1008,7 +932,7 @@
           "title": "Client cache hits vs misses over time",
           "layout": {
             "column": 7,
-            "row": 17,
+            "row": 14,
             "width": 6,
             "height": 3
           },
