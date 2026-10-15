@@ -28,7 +28,29 @@ locals {
   function_name       = "newrelic-${var.newrelic_logging_identifier}-${var.region}-logs-function"
   memory_in_mbs       = "128"
   time_out_in_seconds = 300
-  image_url           = "${var.region}.ocir.io/idptojlonu4e/newrelic-logs-integration/oci-log-forwarder:${var.image_version}"
+
+  # The function runs from a copy of var.function_image in the tenancy's own Container
+  # Registry, not from New Relic's own OCIR (the old image_url path this replaces).
+  ocir_host                 = "${var.region}.ocir.io"
+  ocir_namespace            = oci_artifacts_container_repository.log_forwarder_repo.namespace
+  function_image_repository = "newrelic-${var.newrelic_logging_identifier}/oci-log-forwarder"
+  function_image_digest     = data.external.function_image.result.digest
+  function_image            = "${local.ocir_host}/${local.ocir_namespace}/${local.function_image_repository}:${data.external.function_image.result.tag}"
+  image_repo_policy_name    = "newrelic_logs_image_repo_policy_DO_NOT_REMOVE_${var.newrelic_logging_identifier}_${var.region}"
+
+  # nonsensitive() here is safe: this only reveals whether the token string was empty, never
+  # the token itself. It's required because count/for_each reject sensitive values outright.
+  create_registry_token = nonsensitive(var.registry_auth_token == "")
+  registry_username     = "${local.ocir_namespace}/${var.registry_username != "" ? var.registry_username : data.oci_identity_user.registry_user[0].name}"
+  # Left sensitive (no nonsensitive() here) so a customer-supplied token stays masked in
+  # plan/apply console output and whatever captures it (ORM/CI job logs). Terraform suppresses
+  # the whole local-exec invocation's output when this branch is taken, including image_mirror.py's
+  # progress log -- that's the correct trade: no partial masking exists, so visibility loses to
+  # not leaking the credential. When we create the token ourselves instead (the other branch),
+  # progress stays visible, because terraform-provider-oci's oci_identity_auth_token resource never
+  # marks its own `token` attribute Sensitive -- a provider-level gap outside this module's control,
+  # so that value is already in the Terraform state in plaintext regardless of what we do here.
+  registry_password = local.create_registry_token ? oci_identity_auth_token.registry_push[0].token : var.registry_auth_token
 
   # connector hub config
   batch_size_in_kbs = 6000

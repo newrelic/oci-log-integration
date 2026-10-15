@@ -14,7 +14,6 @@ variableGroups:
       - ${newrelic_logging_identifier}
       - ${newrelic_account_id}
       - ${payload_link}
-      - ${image_version}
       - ${metrics_tier}
 
   - title: "Network options"
@@ -23,6 +22,17 @@ variableGroups:
       - ${vcnCompartment}
       - ${existingVcn}
       - ${function_subnet_id}
+
+  - title: "Function image"
+    variables:
+      - ${function_image}
+      - ${registry_username}
+      - ${registry_auth_token}
+
+  - title: "Hidden"
+    visible: false
+    variables:
+      - ${current_user_ocid}
 
 variables:
   tenancy_ocid:
@@ -87,10 +97,37 @@ variables:
   
   image_version:
     title: Docker Image Version
-    description: Version of the docker image to use
+    description: Deprecated, no longer used. Superseded by Function image below.
     type: string
     required: true
     default: latest
+    visible: false
+
+  function_image:
+    type: string
+    title: Function image
+    description: Public image for the log-forwarder function. The stack copies it into a private Container Registry repository in this tenancy. Re-apply the stack to pick up a new image pushed under the same tag.
+    required: true
+    default: docker.io/newrelic/oci-log-forwarder:latest
+
+  registry_username:
+    type: string
+    title: Container Registry username
+    description: Optional. Username without the tenancy namespace; defaults to the user running the stack. Set / for users in a non-default identity domain.
+    required: false
+
+  registry_auth_token:
+    type: password
+    title: Container Registry auth token
+    description: Optional. Existing auth token used to push the image. Leave empty to have the stack create one for the user running it (OCI allows at most two per user).
+    required: false
+
+  current_user_ocid:
+    type: string
+    title: Current user OCID
+    description: Populated by Resource Manager.
+    required: false
+    visible: false
 
   metrics_tier:
     type: enum
