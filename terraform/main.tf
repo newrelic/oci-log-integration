@@ -77,6 +77,21 @@ resource "oci_artifacts_container_repository" "log_forwarder_repo" {
   freeform_tags  = local.freeform_tags
 }
 
+# Lets the function pull the image this stack just mirrored into log_forwarder_repo above.
+# Self-contained in this stack rather than relying on the shared policy-setup stack having
+# this grant already -- it doesn't yet (as of this writing, it's only in an unmerged Metrics
+# PR, scoped tenancy-wide). Scoped to this compartment here, not tenancy-wide.
+resource "oci_identity_policy" "image_repo_policy" {
+  provider       = oci.home_provider
+  compartment_id = var.tenancy_ocid
+  description    = "[DO NOT REMOVE] Lets the logs function pull its own mirrored image from this stack's Container Repository"
+  name           = local.image_repo_policy_name
+  statements = [
+    "Allow service faas to read repos in compartment id ${local.compartment_ocid}"
+  ]
+  freeform_tags = local.freeform_tags
+}
+
 resource "oci_identity_auth_token" "registry_push" {
   count       = local.create_registry_token ? 1 : 0
   provider    = oci.home_provider

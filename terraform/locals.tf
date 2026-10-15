@@ -36,6 +36,7 @@ locals {
   function_image_repository = "newrelic-${var.newrelic_logging_identifier}/oci-log-forwarder"
   function_image_digest     = data.external.function_image.result.digest
   function_image            = "${local.ocir_host}/${local.ocir_namespace}/${local.function_image_repository}:${data.external.function_image.result.tag}"
+  image_repo_policy_name    = "newrelic_logs_image_repo_policy_DO_NOT_REMOVE_${var.newrelic_logging_identifier}_${var.region}"
 
   # nonsensitive() here is safe: this only reveals whether the token string was empty, never
   # the token itself. It's required because count/for_each reject sensitive values outright.
