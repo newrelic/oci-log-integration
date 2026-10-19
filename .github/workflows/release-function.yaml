@@ -16,6 +16,36 @@ permissions:
   contents: read
 
 jobs:
+  check_version_bump:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      # A shipped function change must carry a new version, otherwise the push to
+      # OCIR would skip the existing version tag and nothing would be released.
+      - name: Require a version bump for function changes
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          changed="$(git diff --name-only "origin/${BASE_REF}...HEAD" -- logs-function \
+            ':(exclude,glob)logs-function/**/*_test.go' ':(exclude)logs-function/VERSION')"
+          if [ -z "$changed" ]; then
+            echo "No shipped function changes; no version bump needed."
+            exit 0
+          fi
+          old="$(git show "origin/${BASE_REF}:logs-function/VERSION" 2>/dev/null | tr -d '[:space:]')"
+          new="$(tr -d '[:space:]' < logs-function/VERSION)"
+          echo "Function changes:"; echo "$changed"
+          if [ "$old" = "$new" ] || [ "$(printf '%s\n%s\n' "$old" "$new" | sort -V | tail -n 1)" != "$new" ]; then
+            echo "logs-function/VERSION must be bumped above ${old:-none} (found ${new})."
+            exit 1
+          fi
+          echo "Version bumped: ${old:-none} -> ${new}"
+
   build_docker_image:
     runs-on: ubuntu-latest
     environment:
@@ -86,9 +116,23 @@ jobs:
       - name: Set permissions for build script
         run: chmod +x scripts/build_and_push_image.sh
 
+      # Only the newest version on main may move latest (guards re-runs of old runs)
+      - name: Decide whether this version moves latest
+        id: newest
+        run: |
+          git fetch --depth=1 origin main
+          main_version="$(git show origin/main:logs-function/VERSION | tr -d '[:space:]')"
+          this_version="$(tr -d '[:space:]' < logs-function/VERSION)"
+          if [ "$main_version" = "$this_version" ]; then
+            echo "push_latest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "push_latest=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Push Docker Image to ${{ matrix.region }}
         run: ./scripts/build_and_push_image.sh ${{ matrix.region }}
         env:
+          PUSH_LATEST: ${{ steps.newest.outputs.push_latest }}
           ORACLE_AUTH_TOKEN: ${{ secrets.ORACLE_AUTH_TOKEN }}
           OCI_REGION: ${{ matrix.region }}
           OCI_TENANCY_NAMESPACE: ${{ secrets.OCI_TENANCY_NAMESPACE }}
@@ -97,6 +141,7 @@ jobs:
   # Publishes the canonical image to Docker Hub. Customer stacks copy this image into
   # their own OCIR at apply time (see terraform/image_mirror.py) instead of pulling
   # directly from the region matrix above, which stays in place during the migration.
+  # The tags are the same as in OCIR: logs-function/VERSION and latest.
   push_dockerhub_image:
     runs-on: ubuntu-latest
     needs: build_docker_image
@@ -107,26 +152,33 @@ jobs:
       contents: write
     steps:
 
-      - name: Set FUNCTION_BUILD_VERSION
-        run: |
-          major=1
-          minor=$((1 + ${{ github.run_number }}))
-          echo "FUNCTION_BUILD_VERSION=${major}.${minor}" >> $GITHUB_ENV
-
       - name: Checkout code
         uses: actions/checkout@v7.0.1
 
       - name: Set permissions for publish script
         run: chmod +x scripts/push_dockerhub_image.sh
 
+      # Only the newest version on main may move latest (guards re-runs of old runs)
+      - name: Decide whether this version moves latest
+        id: newest
+        run: |
+          git fetch --depth=1 origin main
+          main_version="$(git show origin/main:logs-function/VERSION | tr -d '[:space:]')"
+          this_version="$(tr -d '[:space:]' < logs-function/VERSION)"
+          if [ "$main_version" = "$this_version" ]; then
+            echo "push_latest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "push_latest=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Push Docker Image to Docker Hub
         id: push_dockerhub
         run: ./scripts/push_dockerhub_image.sh
         env:
+          PUSH_LATEST: ${{ steps.newest.outputs.push_latest }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           DOCKERHUB_REPOSITORY: newrelic/oci-log-forwarder
-          FUNCTION_BUILD_VERSION: ${{ env.FUNCTION_BUILD_VERSION }}
 
       # SLC-recommended digest pinning (SLCREV-1730): the released stack should ship
       # pinned to the exact image this run just pushed, not a floating :latest tag.
@@ -155,3 +207,43 @@ jobs:
           git add terraform/variables.tf
           git commit -m "Pin function_image default to ${digest_ref} [skip ci]"
           git push origin HEAD:main
+
+  release_function:
+    runs-on: ubuntu-latest
+    needs: [push_docker_image, push_dockerhub_image]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      # Required to create tags and releases
+      contents: write
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+
+      - name: Read function version
+        id: version
+        run: echo "value=$(tr -d '[:space:]' < logs-function/VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Check if release already exists
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "function-${{ steps.version.outputs.value }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: function-${{ steps.version.outputs.value }}
+          name: "oci-log-forwarder function ${{ steps.version.outputs.value }}"
+          body: |
+            OCI log forwarder function image, published to Docker Hub (`docker.io/newrelic/oci-log-forwarder`) and to OCIR in every region as `${{ steps.version.outputs.value }}` and `latest`.
+
+            Leave `function_image` on `:latest` to always use the newest function, or set it to `docker.io/newrelic/oci-log-forwarder:${{ steps.version.outputs.value }}` to pin this release.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

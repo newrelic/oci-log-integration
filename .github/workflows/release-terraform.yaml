@@ -21,7 +21,14 @@ jobs:
 
       - name: Read version
         id: version
-        run: echo "value=$(tr -d '[:space:]' < terraform/VERSION)" >> "$GITHUB_OUTPUT"
+        run: |
+          # The template version is the top-level `version:` in schema.yaml
+          version="$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' terraform/schema.yaml)"
+          if [ -z "$version" ]; then
+            echo "Could not read the template version from terraform/schema.yaml"
+            exit 1
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
 
       - name: Check if release already exists
         id: check
@@ -50,7 +57,10 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.value }}
           name: "oci-log-integration ${{ steps.version.outputs.value }}"
-          body: "Static release of the OCI Log Integration Terraform module."
+          body: |
+            Static release of the OCI Log Integration Terraform module (ORM template).
+
+            The function image is versioned and released separately (`function-<version>` releases). See the compatibility table in the README for the minimum function version this template needs.
           files: oci-log-integration.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -21,13 +21,32 @@ Covers 4 log types via prefix-matched rules: Network Firewall, DNS Private Resol
 
 Resolution is batched per invocation: every record is scanned once, the distinct OCIDs needing a lookup are deduped across the whole batch, chunked to Resource Search's 20-OCID-per-query limit, and resolved concurrently with retry on transient failures. A partial failure doesn't block forwarding — unresolved records just go out without a name.
 
-## Image hosting and versioning
+## Image hosting, versioning and releases
 
 The log-forwarder function image is published to Docker Hub (`docker.io/newrelic/oci-log-forwarder`). At apply time, the stack copies it into a private Container Registry repository in your own tenancy and runs the Function from that copy — your tenancy never pulls directly from Docker Hub at runtime, only during `apply`.
 
 This means **the machine running `apply` needs outbound network access to Docker Hub** (`registry-1.docker.io` and `auth.docker.io`), in addition to the OCI API endpoints the stack already requires. If your environment restricts outbound internet access, allow-list those hosts before applying.
 
-**Versioning:** the `function_image` variable defaults to the `:latest` tag. Re-applying the stack checks what image that tag currently points to and copies the new one if it's changed, so you'll pick up new releases automatically on your next `apply` without any action. To control exactly when you upgrade instead, pin `function_image` to a specific version tag (e.g. `docker.io/newrelic/oci-log-forwarder:1.42`) — the stack will then only ever copy that pinned version, and upgrading becomes a deliberate change to that variable followed by `apply`.
+The function and the Resource Manager (ORM) template are versioned and released independently.
+
+| Component | Version file | What is released | Release tag |
+|---|---|---|---|
+| Function (Go log forwarder) | [`logs-function/VERSION`](logs-function/VERSION) | Image pushed to Docker Hub (and, during the migration, to OCIR in every region) as `<version>` and `latest` | `function-<version>` |
+| Template (ORM stack, `terraform/`) | `version:` in [`terraform/schema.yaml`](terraform/schema.yaml) | `oci-log-integration.zip` | `<version>` |
+
+* **Function:** any change under `logs-function/**` must bump `logs-function/VERSION`. A `<version>` image tag is never overwritten once published, and `latest` moves to the newest release.
+* **Template:** any change under `terraform/**` that ships to customers must bump `version:` in `terraform/schema.yaml`. That is the only place the template version is kept, and the release workflow reads it from there.
+* **Default and upgrading:** the `function_image` variable defaults to the `:latest` tag. Re-applying the stack checks what image that tag currently points to and copies the new one if it's changed, so you'll pick up new releases automatically on your next `apply` without any action.
+* **Pinning and rollback:** to control exactly when you upgrade, pin `function_image` to a specific version tag (for example `docker.io/newrelic/oci-log-forwarder:1.3.0`). The stack will then only ever copy that pinned version, and upgrading or rolling back is a deliberate change to that variable followed by `apply`. The old `image_version` variable is deprecated and no longer used.
+* **Mapping:** the template does not reference a function version, so the two do not have to be released together. When a template change needs a newer function (for example a new variable the function must understand) or a newer Terraform provider, record the minimum versions in the table below in the same pull request.
+
+### Version compatibility
+
+| Template (ORM) version | Minimum function version | Minimum Terraform provider version (`terraform-provider-newrelic`) | Notes |
+|---|---|---|---|
+| 1.2.0 | any (`latest`) | v3.99.2 | Current template. v3.99.2 is the first provider release with `metrics_tier`; confirm before relying on it. |
+
+There is no backward compatibility: past releases are not given versions. Versioning starts with function `1.3.0`, and from here on we only add new versions. Earlier function builds were published as `latest` only, so they cannot be pinned.
 
 
 ## Contributing
