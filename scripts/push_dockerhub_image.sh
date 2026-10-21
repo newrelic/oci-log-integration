@@ -40,20 +40,36 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo "3. Tagging and pushing ${dockerhub_repository}:${function_build_version} and :latest..."
-for tag in "${function_build_version}" latest; do
-    docker tag "${image_name}:${image_tag}" "${dockerhub_repository}:${tag}"
-    if [ $? -ne 0 ]; then
-        echo "Error: Docker image tagging failed for tag ${tag}."
-        exit 1
-    fi
+remote_image="${dockerhub_repository}"
 
-    docker push "${dockerhub_repository}:${tag}"
-    if [ $? -ne 0 ]; then
-        echo "Error: Docker image push failed for tag ${tag}."
-        exit 1
-    fi
-done
+# A version tag is immutable: re-running a release must never overwrite it, so
+# pinned customers always get the same image for a given version.
+echo "3. Pushing version tag ${function_build_version}..."
+inspect_output="$(docker manifest inspect "${remote_image}:${function_build_version}" 2>&1)"
+inspect_status=$?
+if [ ${inspect_status} -eq 0 ]; then
+    echo "Tag ${function_build_version} already exists on Docker Hub; skipping push and reusing the published image."
+    docker pull "${remote_image}:${function_build_version}" || { echo "Error: Failed to pull existing ${function_build_version}."; exit 1; }
+elif echo "${inspect_output}" | grep -qiE "no such manifest|manifest unknown|not found"; then
+    docker tag "${image_name}:${image_tag}" "${remote_image}:${function_build_version}" || { echo "Error: Docker image tagging failed."; exit 1; }
+    docker push "${remote_image}:${function_build_version}" || { echo "Error: Docker image push failed."; exit 1; }
+    echo "Successfully pushed ${function_build_version}."
+else
+    # Could not tell whether the tag exists (auth, network, ...): never risk overwriting it.
+    echo "Error: could not check whether ${function_build_version} exists on Docker Hub: ${inspect_output}"
+    exit 1
+fi
+
+# latest is pushed last, from the published version image, so it only moves once the
+# versioned image is in place and always matches it. PUSH_LATEST=false keeps a re-run
+# of an older release from moving latest backwards.
+if [ "${PUSH_LATEST:-true}" = "true" ]; then
+    echo "4. Pushing latest tag..."
+    docker tag "${remote_image}:${function_build_version}" "${remote_image}:latest" || { echo "Error: Docker image tagging failed."; exit 1; }
+    docker push "${remote_image}:latest" || { echo "Error: Docker image push failed."; exit 1; }
+else
+    echo "4. Skipping latest tag: ${function_build_version} is not the newest version on main."
+fi
 
 echo "4. Reading back the pushed digest for ${dockerhub_repository}:${function_build_version}..."
 # docker updates RepoDigests on the local image record once a push succeeds, so this
