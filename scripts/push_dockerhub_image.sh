@@ -55,4 +55,20 @@ for tag in "${function_build_version}" latest; do
     fi
 done
 
+echo "4. Reading back the pushed digest for ${dockerhub_repository}:${function_build_version}..."
+# docker updates RepoDigests on the local image record once a push succeeds, so this
+# reads the digest the registry actually stored -- not a locally-computed guess.
+# RepoDigests' repo portion isn't guaranteed to include the docker.io/ host, so pull
+# just the @sha256:... suffix and rebuild the reference explicitly.
+digest_only=$(docker inspect --format='{{index .RepoDigests 0}}' "${dockerhub_repository}:${function_build_version}" | sed -E 's#^.*(@sha256:[0-9a-f]+)$#\1#')
+if [ -z "${digest_only}" ]; then
+    echo "Error: Could not read back a pushed digest for ${dockerhub_repository}:${function_build_version}."
+    exit 1
+fi
+digest_ref="docker.io/${dockerhub_repository}${digest_only}"
+echo "Pushed digest: ${digest_ref}"
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    echo "image_digest_ref=${digest_ref}" >> "${GITHUB_OUTPUT}"
+fi
+
 echo "--- Docker Hub Publish Completed Successfully ---"

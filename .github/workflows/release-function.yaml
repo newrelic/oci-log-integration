@@ -103,6 +103,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     environment:
       name: build-test-env
+    permissions:
+      contents: write
     steps:
 
       - name: Set FUNCTION_BUILD_VERSION
@@ -118,9 +120,38 @@ jobs:
         run: chmod +x scripts/push_dockerhub_image.sh
 
       - name: Push Docker Image to Docker Hub
+        id: push_dockerhub
         run: ./scripts/push_dockerhub_image.sh
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           DOCKERHUB_REPOSITORY: newrelic/oci-log-forwarder
           FUNCTION_BUILD_VERSION: ${{ env.FUNCTION_BUILD_VERSION }}
+
+      # SLC-recommended digest pinning (SLCREV-1730): the released stack should ship
+      # pinned to the exact image this run just pushed, not a floating :latest tag.
+      # Only on real pushes to main -- not on a manual workflow_dispatch test run --
+      # so this commit lands in lockstep with the release-terraform.yaml zip it feeds.
+      - name: Pin function_image default to the pushed digest
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          digest_ref="${{ steps.push_dockerhub.outputs.image_digest_ref }}"
+          # Scoped to the function_image block only -- variables.tf has several other
+          # `default = ...` lines (image_version, create_vcn, metrics_tier, ...) that
+          # an unscoped substitution would corrupt. Uses awk, not sed -E, because BSD
+          # and GNU sed disagree on brace-escaping for the block-boundary match.
+          awk -v ref="${digest_ref}" '
+            /variable "function_image" \{/ { in_block=1 }
+            in_block && /default[ \t]*=/ { sub(/default[ \t]*=.*/, "default     = \"" ref "\""); in_block=0 }
+            { print }
+          ' terraform/variables.tf > terraform/variables.tf.tmp
+          mv terraform/variables.tf.tmp terraform/variables.tf
+          if git diff --quiet -- terraform/variables.tf; then
+            echo "terraform/variables.tf already pinned to ${digest_ref} -- nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add terraform/variables.tf
+          git commit -m "Pin function_image default to ${digest_ref} [skip ci]"
+          git push origin HEAD:main
