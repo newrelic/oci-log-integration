@@ -56,6 +56,8 @@ func splitLogsIntoBatches(ctx context.Context, logs common.OCILoggingEvent, maxP
 
 		logBytes, err := json.Marshal(logData)
 		if err != nil {
+			// Counted as dropped so received == delivered + dropped still reconciles.
+			metricRecorder.Count(metrics.Basic.MetricRecordsDropped, 1, map[string]interface{}{"reason": "serialize_error"})
 			log.Warnf("Warning: Could not marshal detailed log for size estimation: %v", err)
 			continue
 		}

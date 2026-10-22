@@ -481,3 +481,26 @@ func TestSplitLogsIntoBatches_ProducerCancelledDropsUnbatchedRemainder(t *testin
 	}
 	assert.Equal(t, float64(len(logs)), dropped, "all 4 records (the failed batch plus the unbatched remainder) must be counted as dropped")
 }
+
+// TestSplitLogsIntoBatches_SerializeErrorCountedAsDropped verifies a record that can't be
+// marshaled for size estimation is counted in forwarder.records.dropped, so
+// received == delivered + dropped still reconciles.
+func TestSplitLogsIntoBatches_SerializeErrorCountedAsDropped(t *testing.T) {
+	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierBasic))
+	defer os.Unsetenv(common.MetricsTier)
+
+	rec := metrics.NewRecorder(nil)
+	channel := make(chan util.BatchMessage, 10)
+
+	logs := common.OCILoggingEvent{
+		map[string]interface{}{"unmarshalable": make(chan int)},
+	}
+
+	splitLogsIntoBatches(context.Background(), logs, 1000, common.LogAttributes{}, channel, rec)
+	close(channel)
+	for range channel {
+	}
+
+	names := metricstest.FlushedMetricNames(t, rec)
+	assert.True(t, names["forwarder.records.dropped"], "a record that fails to marshal must still be counted as dropped")
+}

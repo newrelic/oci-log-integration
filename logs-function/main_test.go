@@ -214,7 +214,7 @@ func TestHandleFunctionWithClient_EnrichmentEnabledButClientUnavailable(t *testi
 	ctx := context.Background()
 
 	assert.NotPanics(t, func() {
-		handleFunctionWithClient(ctx, input, output, mockClient)
+		handleFunctionWithClient(ctx, input, output, mockClient, nil)
 		time.Sleep(100 * time.Millisecond)
 	}, "a resource search client failure must not block log forwarding")
 
