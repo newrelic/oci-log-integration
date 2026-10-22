@@ -6,11 +6,48 @@ on:
       - main
     paths:
       - 'terraform/**'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'terraform/**'
   workflow_dispatch:
 
 jobs:
+  check_version_bump:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Everything under terraform/ is zipped into the release, so any change there must
+      # carry a new template version or the release job would skip it.
+      - name: Require a version bump for template changes
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          read_version() { sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' | tr -d '[:space:]'; }
+          changed="$(git diff --name-only "origin/${BASE_REF}...HEAD" -- terraform)"
+          echo "Template changes:"; echo "$changed"
+          old="$(git show "origin/${BASE_REF}:terraform/schema.yaml" 2>/dev/null | read_version)"
+          new="$(read_version < terraform/schema.yaml)"
+          if [ -z "$new" ]; then
+            echo "Could not read the template version from terraform/schema.yaml"
+            exit 1
+          fi
+          if [ "$old" = "$new" ] || [ "$(printf '%s\n%s\n' "$old" "$new" | sort -V | tail -n 1)" != "$new" ]; then
+            echo "version: in terraform/schema.yaml must be bumped above ${old:-none} (found ${new})."
+            exit 1
+          fi
+          echo "Version bumped: ${old:-none} -> ${new}"
+
   release:
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
     permissions:
       # Required to create tags and releases
       contents: write

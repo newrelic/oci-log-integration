@@ -48,9 +48,16 @@ echo "3. Pushing version tag ${function_build_version}..."
 inspect_output="$(docker manifest inspect "${remote_image}:${function_build_version}" 2>&1)"
 inspect_status=$?
 if [ ${inspect_status} -eq 0 ]; then
+    if [ "${REQUIRE_NEW_VERSION:-false}" = "true" ]; then
+        # The pushed code changed but the tag is taken: the new code would never be
+        # published and customers would keep pulling the old image.
+        echo "Error: shipped function files changed but ${function_build_version} already exists on Docker Hub, so the new code would not be released."
+        echo "Bump logs-function/VERSION and merge again to release the change under a new version tag."
+        exit 1
+    fi
     echo "Tag ${function_build_version} already exists on Docker Hub; skipping push and reusing the published image."
     docker pull "${remote_image}:${function_build_version}" || { echo "Error: Failed to pull existing ${function_build_version}."; exit 1; }
-elif echo "${inspect_output}" | grep -qiE "no such manifest|manifest unknown|not found"; then
+elif echo "${inspect_output}" | grep -qiE "no such manifest|manifest unknown"; then
     docker tag "${image_name}:${image_tag}" "${remote_image}:${function_build_version}" || { echo "Error: Docker image tagging failed."; exit 1; }
     docker push "${remote_image}:${function_build_version}" || { echo "Error: Docker image push failed."; exit 1; }
     echo "Successfully pushed ${function_build_version}."

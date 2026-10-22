@@ -141,6 +141,32 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      # On a push to main, an already-published version tag is only acceptable when the
+      # push did not change shipped function files (e.g. tests only); otherwise the
+      # publish script fails and asks for a VERSION bump. Manual dispatches and re-runs
+      # never fail on an existing tag.
+      - name: Detect shipped function changes in this push
+        if: github.event_name == 'push'
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          # A re-run finds the tag its own first attempt published; that is not a missed release.
+          if [ "$RUN_ATTEMPT" -gt 1 ] || echo "$BEFORE_SHA" | grep -qE '^0+$' || ! git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+            echo "REQUIRE_NEW_VERSION=false" >> $GITHUB_ENV
+            exit 0
+          fi
+          changed="$(git diff --name-only "${BEFORE_SHA}" "${GITHUB_SHA}" -- logs-function \
+            ':(exclude,glob)logs-function/**/*_test.go' ':(exclude)logs-function/VERSION')"
+          if [ -n "$changed" ]; then
+            echo "Shipped function changes in this push:"; echo "$changed"
+            echo "REQUIRE_NEW_VERSION=true" >> $GITHUB_ENV
+          else
+            echo "REQUIRE_NEW_VERSION=false" >> $GITHUB_ENV
+          fi
 
       # The version tag comes from logs-function/VERSION; latest is pushed alongside it.
       - name: Set FUNCTION_BUILD_VERSION
@@ -170,6 +196,7 @@ jobs:
           DOCKERHUB_REPOSITORY: newrelic/oci-log-forwarder
           FUNCTION_BUILD_VERSION: ${{ env.FUNCTION_BUILD_VERSION }}
           PUSH_LATEST: ${{ env.PUSH_LATEST }}
+          REQUIRE_NEW_VERSION: ${{ env.REQUIRE_NEW_VERSION }}
 
       # SLC-recommended digest pinning (SLCREV-1730): the released stack should ship
       # pinned to the exact image this run just pushed, not a floating :latest tag.
