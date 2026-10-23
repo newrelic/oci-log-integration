@@ -24,6 +24,7 @@ Terraform knows it at plan time (pinned via the function's image_digest, not jus
 """
 import base64
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -244,13 +245,22 @@ class Registry:
     def download_blob(self, digest, path):
         for attempt in range(1, MAX_ATTEMPTS + 1):
             sha = hashlib.sha256()
-            with self.request("GET", "/blobs/" + digest) as response, open(path, "wb") as out:
-                while True:
-                    chunk = response.read(CHUNK_SIZE)
-                    if not chunk:
-                        break
-                    sha.update(chunk)
-                    out.write(chunk)
+            try:
+                with self.request("GET", "/blobs/" + digest) as response, open(path, "wb") as out:
+                    while True:
+                        chunk = response.read(CHUNK_SIZE)
+                        if not chunk:
+                            break
+                        sha.update(chunk)
+                        out.write(chunk)
+            except (OSError, http.client.HTTPException) as e:
+                # request() only retries establishing the connection/response -- a network
+                # error while streaming this body afterward (including a short read the
+                # server never completes, http.client.IncompleteRead) lands here instead,
+                # uncaught by anything upstream, so it needs its own retry.
+                log("blob %s download failed (%s), retrying (%d/%d)" % (digest, e, attempt, MAX_ATTEMPTS))
+                _backoff(attempt)
+                continue
             if "sha256:" + sha.hexdigest() == digest:
                 return
             log("blob %s failed digest verification, downloading again (%d/%d)" % (digest, attempt, MAX_ATTEMPTS))

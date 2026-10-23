@@ -100,7 +100,9 @@ jobs:
   push_dockerhub_image:
     runs-on: ubuntu-latest
     needs: build_docker_image
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    # github.ref must be main for both event types -- without it, workflow_dispatch could be
+    # run from a feature branch and push its unreviewed code to the canonical Docker Hub repo.
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
     environment:
       name: build-test-env
     permissions:
@@ -119,6 +121,9 @@ jobs:
       - name: Set permissions for publish script
         run: chmod +x scripts/push_dockerhub_image.sh
 
+      # DOCKERHUB_USERNAME/DOCKERHUB_TOKEN are repository-level GitHub Actions secrets on
+      # newrelic/oci-log-integration (Settings -> Secrets and variables -> Actions) -- not
+      # scoped to the build-test-env environment below, which only gates approval.
       - name: Push Docker Image to Docker Hub
         id: push_dockerhub
         run: ./scripts/push_dockerhub_image.sh

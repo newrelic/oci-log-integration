@@ -39,8 +39,16 @@ locals {
 
   # nonsensitive() here is safe: this only reveals whether the token string was empty, never
   # the token itself. It's required because count/for_each reject sensitive values outright.
-  create_registry_token = nonsensitive(var.registry_auth_token == "")
-  registry_username     = "${local.ocir_namespace}/${var.registry_username != "" ? var.registry_username : data.oci_identity_user.registry_user[0].name}"
+  create_registry_token           = nonsensitive(var.registry_auth_token == "")
+  registry_push_token_description = "New Relic logs stack: pushes the function image to ${local.function_image_repository} in ${var.region}"
+  # data.oci_identity_auth_tokens.existing is re-read on every plan, so once this stack has
+  # created its own token, that token itself shows up in the list -- excluding it here is what
+  # keeps the 2-token-cap precondition in main.tf from failing on every subsequent re-apply.
+  other_existing_auth_tokens = local.create_registry_token ? [
+    for t in data.oci_identity_auth_tokens.existing[0].tokens : t
+    if t.description != local.registry_push_token_description
+  ] : []
+  registry_username = "${local.ocir_namespace}/${var.registry_username != "" ? var.registry_username : data.oci_identity_user.registry_user[0].name}"
   # Left sensitive (no nonsensitive() here) so a customer-supplied token stays masked in
   # plan/apply console output and whatever captures it (ORM/CI job logs). Terraform suppresses
   # the whole local-exec invocation's output when this branch is taken, including image_mirror.py's

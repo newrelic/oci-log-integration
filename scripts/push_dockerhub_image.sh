@@ -1,6 +1,8 @@
 #!/bin/bash
 
 # --- Configuration Variables ---
+# DOCKERHUB_USERNAME/DOCKERHUB_TOKEN come from repository-level GitHub Actions secrets on
+# newrelic/oci-log-integration, injected by release-function.yaml's push_dockerhub_image job.
 dockerhub_username="${DOCKERHUB_USERNAME}"
 dockerhub_token="${DOCKERHUB_TOKEN}"
 function_build_version="${FUNCTION_BUILD_VERSION}"
@@ -22,6 +24,9 @@ echo "--- Starting Docker Hub Publish (Version: ${function_build_version}) ---"
 
 echo "1. Building Docker image..."
 # Functions run on GENERIC_X86 (linux/amd64), and customer stacks copy this image as-is.
+# --platform is pinned explicitly, not left to the runner's default: GitHub-hosted amd64
+# runners happen to match today, but an arm64 runner or a contributor building locally on
+# Apple Silicon would otherwise silently produce an image the function can't run.
 # provenance/sbom disabled so the pushed image stays a single plain manifest --
 # the mirror's change-check (image_mirror.py) compares that one manifest's digest.
 docker build --platform linux/amd64 --provenance=false --sbom=false \
