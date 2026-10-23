@@ -84,8 +84,6 @@ type AdvancedMetrics struct {
 	MetricBytesDelivered   Metric
 	MetricClientCache      Metric
 	MetricBytesReceived    Metric
-	MetricDecodeErrors     Metric
-	MetricSerializeErrors  Metric
 	MetricRecordsOversized Metric
 	MetricBatchesCreated   Metric
 	MetricBatchSizeBytes   Metric
@@ -110,8 +108,6 @@ var Advanced = AdvancedMetrics{
 	MetricBytesDelivered:   advanced("forwarder.bytes.delivered"),
 	MetricClientCache:      advanced("forwarder.client.cache"),
 	MetricBytesReceived:    advanced("forwarder.bytes.received"),
-	MetricDecodeErrors:     advanced("forwarder.decode.errors"),
-	MetricSerializeErrors:  advanced("forwarder.serialize.errors"),
 	MetricRecordsOversized: advanced("forwarder.records.oversized"),
 	MetricBatchesCreated:   advanced("forwarder.batches.created"),
 	MetricBatchSizeBytes:   advanced("forwarder.batch.size_bytes"),

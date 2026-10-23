@@ -62,22 +62,6 @@ func TestUnmarshal_RecordsBytesReceived(t *testing.T) {
 	assert.True(t, names["forwarder.bytes.received"])
 }
 
-// TestUnmarshal_RecordsDecodeErrors verifies forwarder.decode.errors is recorded right
-// before the panic on invalid input, at the advanced tier.
-func TestUnmarshal_RecordsDecodeErrors(t *testing.T) {
-	assert.NoError(t, os.Setenv(common.MetricsTier, common.MetricsTierAdvanced))
-	defer os.Unsetenv(common.MetricsTier)
-
-	rec := metrics.NewRecorder(nil)
-	var event Event
-	assert.Panics(t, func() {
-		_ = event.Unmarshal(bytes.NewReader([]byte(`{not valid json`)), rec)
-	})
-
-	names := metricstest.FlushedMetricNames(t, rec)
-	assert.True(t, names["forwarder.decode.errors"])
-}
-
 // TestUnmarshalSingleOCILoggingEvent tests unmarshaling a single nested JSON log event
 func TestUnmarshalSingleOCILoggingEvent(t *testing.T) {
 	input := []byte(`[
