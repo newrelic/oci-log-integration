@@ -78,7 +78,7 @@ else
     echo "4. Skipping latest tag: ${function_build_version} is not the newest version on main."
 fi
 
-echo "4. Reading back the pushed digest for ${dockerhub_repository}:${function_build_version}..."
+echo "5. Reading back the pushed digest for ${dockerhub_repository}:${function_build_version}..."
 # docker updates RepoDigests on the local image record once a push succeeds, so this
 # reads the digest the registry actually stored -- not a locally-computed guess.
 # RepoDigests' repo portion isn't guaranteed to include the docker.io/ host, so pull
