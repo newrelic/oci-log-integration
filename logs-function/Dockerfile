@@ -1,5 +1,5 @@
 # Build stage: compile Go binary
-FROM golang:1.26.9 AS build-stage
+FROM golang:1.27.2 AS build-stage
 
 WORKDIR /function
 
