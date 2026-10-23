@@ -93,3 +93,70 @@ jobs:
           OCI_REGION: ${{ matrix.region }}
           OCI_TENANCY_NAMESPACE: ${{ secrets.OCI_TENANCY_NAMESPACE }}
           OCI_USERNAME: ${{ secrets.OCI_USERNAME }}
+
+  # Publishes the canonical image to Docker Hub. Customer stacks copy this image into
+  # their own OCIR at apply time (see terraform/image_mirror.py) instead of pulling
+  # directly from the region matrix above, which stays in place during the migration.
+  push_dockerhub_image:
+    runs-on: ubuntu-latest
+    needs: build_docker_image
+    # github.ref must be main for both event types -- without it, workflow_dispatch could be
+    # run from a feature branch and push its unreviewed code to the canonical Docker Hub repo.
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+    environment:
+      name: build-test-env
+    permissions:
+      contents: write
+    steps:
+
+      - name: Set FUNCTION_BUILD_VERSION
+        run: |
+          major=1
+          minor=$((1 + ${{ github.run_number }}))
+          echo "FUNCTION_BUILD_VERSION=${major}.${minor}" >> $GITHUB_ENV
+
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+
+      - name: Set permissions for publish script
+        run: chmod +x scripts/push_dockerhub_image.sh
+
+      # DOCKERHUB_USERNAME/DOCKERHUB_TOKEN are repository-level GitHub Actions secrets on
+      # newrelic/oci-log-integration (Settings -> Secrets and variables -> Actions) -- not
+      # scoped to the build-test-env environment below, which only gates approval.
+      - name: Push Docker Image to Docker Hub
+        id: push_dockerhub
+        run: ./scripts/push_dockerhub_image.sh
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_REPOSITORY: newrelic/oci-log-forwarder
+          FUNCTION_BUILD_VERSION: ${{ env.FUNCTION_BUILD_VERSION }}
+
+      # SLC-recommended digest pinning (SLCREV-1730): the released stack should ship
+      # pinned to the exact image this run just pushed, not a floating :latest tag.
+      # Only on real pushes to main -- not on a manual workflow_dispatch test run --
+      # so this commit lands in lockstep with the release-terraform.yaml zip it feeds.
+      - name: Pin function_image default to the pushed digest
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          digest_ref="${{ steps.push_dockerhub.outputs.image_digest_ref }}"
+          # Scoped to the function_image block only -- variables.tf has several other
+          # `default = ...` lines (image_version, create_vcn, metrics_tier, ...) that
+          # an unscoped substitution would corrupt. Uses awk, not sed -E, because BSD
+          # and GNU sed disagree on brace-escaping for the block-boundary match.
+          awk -v ref="${digest_ref}" '
+            /variable "function_image" \{/ { in_block=1 }
+            in_block && /default[ \t]*=/ { sub(/default[ \t]*=.*/, "default     = \"" ref "\""); in_block=0 }
+            { print }
+          ' terraform/variables.tf > terraform/variables.tf.tmp
+          mv terraform/variables.tf.tmp terraform/variables.tf
+          if git diff --quiet -- terraform/variables.tf; then
+            echo "terraform/variables.tf already pinned to ${digest_ref} -- nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add terraform/variables.tf
+          git commit -m "Pin function_image default to ${digest_ref} [skip ci]"
+          git push origin HEAD:main

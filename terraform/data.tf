@@ -44,3 +44,27 @@ data "oci_secrets_secretbundle" "user_api_key" {
   secret_id = local.user_key_secret_ocid
   provider  = oci.home_provider
 }
+
+# Resolved on every plan, so re-applying the stack notices when the tag points at a new image.
+data "external" "function_image" {
+  program = ["python", "${path.module}/image_mirror.py", "resolve"]
+  query = {
+    source_image = var.function_image
+    platform     = "linux/amd64"
+  }
+}
+
+data "oci_identity_user" "registry_user" {
+  count    = var.registry_username == "" ? 1 : 0
+  user_id  = var.current_user_ocid
+  provider = oci.home_provider
+}
+
+# Only fetched when we're about to create a token (see oci_identity_auth_token.registry_push's
+# precondition) -- OCI caps auth tokens at 2 per user, and creating a 3rd fails with a raw API
+# error. Checking the existing count lets us fail with a clear message instead.
+data "oci_identity_auth_tokens" "existing" {
+  count    = local.create_registry_token ? 1 : 0
+  user_id  = var.current_user_ocid
+  provider = oci.home_provider
+}

@@ -21,6 +21,15 @@ Covers 4 log types via prefix-matched rules: Network Firewall, DNS Private Resol
 
 Resolution is batched per invocation: every record is scanned once, the distinct OCIDs needing a lookup are deduped across the whole batch, chunked to Resource Search's 20-OCID-per-query limit, and resolved concurrently with retry on transient failures. A partial failure doesn't block forwarding — unresolved records just go out without a name.
 
+## Image hosting and versioning
+
+The log-forwarder function image is published to Docker Hub (`docker.io/newrelic/oci-log-forwarder`). At apply time, the stack copies it into a private Container Registry repository in your own tenancy and runs the Function from that copy — your tenancy never pulls directly from Docker Hub at runtime, only during `apply`.
+
+This means **the machine running `apply` needs outbound network access to Docker Hub** (`registry-1.docker.io` and `auth.docker.io`) **and to your own tenancy's Container Registry** (`<region>.ocir.io`), in addition to the OCI API endpoints the stack already requires. Docker Hub also redirects actual blob downloads to a separate storage host that varies and isn't one Docker Hub publishes as a fixed hostname — if your environment allow-lists by exact host rather than general HTTPS egress, expect to add that host once you see it in a run, rather than assuming `registry-1.docker.io` alone covers blob transfer.
+
+**Versioning:** the `function_image` variable defaults to the `:latest` tag. Re-applying the stack checks what image that tag currently points to and copies the new one if it's changed, so you'll pick up new releases automatically on your next `apply` without any action. To control exactly when you upgrade instead, pin `function_image` to a specific version tag (e.g. `docker.io/newrelic/oci-log-forwarder:1.42`) — the stack will then only ever copy that pinned version, and upgrading becomes a deliberate change to that variable followed by `apply`.
+
+
 ## Contributing
 
 We encourage your contributions to improve oci-log-integration! Keep in mind when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project. If you have any questions, or to execute our corporate CLA, required if your contribution is on behalf of a company, please drop us an email at opensource@newrelic.com.
