@@ -13,13 +13,40 @@ This repository contains integrations to forward logs from Oracle Cloud Infrastr
 
 The log forwarder Function can emit its own custom metrics directly to New Relic's Metric API, in addition to forwarding logs. This is controlled via the `metrics_tier` Terraform variable (`none` / `basic` / `advanced`; default `basic`). `basic` covers core health (record counts, delivery success/loss, delivery latency, pipeline lag); `advanced` adds deeper root-cause/tuning metrics (byte volumes, decode/serialize errors, batching behavior, delivery error classes, run duration, secret-fetch failures, client-cache hit rate) on top of everything in `basic`.
 
+## Entity synthesis name enrichment
+
+The log forwarder resolves the OCID embedded in a log record to its human-readable OCI display name via OCI Resource Search, and injects it as `logging.oci.displayName` on the record. This field is consumed by entity synthesis and dropped by the platform afterward — it doesn't persist on the customer-visible log record in NRDB.
+
+Covers 4 log types via prefix-matched rules: Network Firewall, DNS Private Resolver, Integration, and GoldenGate. Entity synthesis rules exist for every OCI log-based entity type, including Queue, Streaming, and API Gateway — those three just resolve their name from a field already native to the payload (e.g. `data.gatewayDisplayName`, `source`) instead of this synthetic field, so a Resource Search lookup isn't needed for them. This is always on; there's no opt-out variable.
+
+Resolution is batched per invocation: every record is scanned once, the distinct OCIDs needing a lookup are deduped across the whole batch, chunked to Resource Search's 20-OCID-per-query limit, and resolved concurrently with retry on transient failures. A partial failure doesn't block forwarding — unresolved records just go out without a name.
+
 ## Image hosting and versioning
 
 The log-forwarder function image is published to Docker Hub (`docker.io/newrelic/oci-log-forwarder`). At apply time, the stack copies it into a private Container Registry repository in your own tenancy and runs the Function from that copy — your tenancy never pulls directly from Docker Hub at runtime, only during `apply`.
 
 This means **the machine running `apply` needs outbound network access to Docker Hub** (`registry-1.docker.io` and `auth.docker.io`), in addition to the OCI API endpoints the stack already requires. If your environment restricts outbound internet access, allow-list those hosts before applying.
 
-**Versioning:** the `function_image` variable defaults to the `:latest` tag. Re-applying the stack checks what image that tag currently points to and copies the new one if it's changed, so you'll pick up new releases automatically on your next `apply` without any action. To control exactly when you upgrade instead, pin `function_image` to a specific version tag (e.g. `docker.io/newrelic/oci-log-forwarder:1.42`) — the stack will then only ever copy that pinned version, and upgrading becomes a deliberate change to that variable followed by `apply`.
+**Versioning:** the `function_image` variable defaults to the `:latest` tag. Re-applying the stack checks what image that tag currently points to and copies the new one if it's changed, so you'll pick up new releases automatically on your next `apply` without any action. Each release is also published under its version number, taken from [`logs-function/VERSION`](logs-function/VERSION) (starting at `1.3.0`). To control exactly when you upgrade instead, pin `function_image` to a specific version tag (e.g. `docker.io/newrelic/oci-log-forwarder:1.3.0`) — the stack will then only ever copy that pinned version, and upgrading becomes a deliberate change to that variable followed by `apply`.
+
+### Releases and compatibility
+
+The function and the Resource Manager (ORM) template are versioned and released independently.
+
+| Component | Version file | What is released | Release tag |
+|---|---|---|---|
+| Function (Go log forwarder) | [`logs-function/VERSION`](logs-function/VERSION) | Image pushed to Docker Hub as `<version>` and `latest` | `function-<version>` |
+| Template (ORM stack, `terraform/`) | `version:` in [`terraform/schema.yaml`](terraform/schema.yaml) | `oci-log-integration.zip` | `<version>` |
+
+* **Function:** any change under `logs-function/**` (other than tests) must bump `logs-function/VERSION`; CI fails the pull request otherwise. A `<version>` image tag is never overwritten once published, and `latest` moves only to the newest version on `main`.
+* **Template:** any change under `terraform/**` that ships to customers must bump `version:` in `terraform/schema.yaml`. That is the only place the template version is kept, and the release workflow reads it from there.
+* **Mapping:** the template's default `function_image` is `:latest`, so it never names a function version and the two need not be released together. When a template change needs a newer function or Terraform provider, record the minimum versions in the table below in the same pull request.
+
+| Template (ORM) version | Minimum function version | Minimum Terraform provider version (`terraform-provider-newrelic`) | Notes |
+|---|---|---|---|
+| 1.3.0 | any (`latest`) | v3.99.2 | Current template. Copies the function image from Docker Hub into your own Container Registry (`function_image`); `image_version` is deprecated. v3.99.2 is the first provider release with `metrics_tier`. |
+
+There is no backward compatibility: past releases are not given versions. Versioning starts with function `1.3.0`; earlier builds were published as `latest` only and cannot be pinned.
 
 ## Contributing
 
