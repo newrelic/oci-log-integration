@@ -6,11 +6,51 @@ on:
       - main
     paths:
       - 'terraform/**'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'terraform/**'
   workflow_dispatch:
 
 jobs:
+  check_version_bump:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Everything under terraform/ is zipped into the release, so any change there must
+      # carry a new template version or the release job would skip it.
+      - name: Require a version bump for template changes
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          read_version() { sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' | tr -d '[:space:]'; }
+          changed="$(git diff --name-only "origin/${BASE_REF}...HEAD" -- terraform)"
+          echo "Template changes:"; echo "$changed"
+          old="$(git show "origin/${BASE_REF}:terraform/schema.yaml" 2>/dev/null | read_version)"
+          new="$(read_version < terraform/schema.yaml)"
+          if [ -z "$new" ]; then
+            echo "Could not read the template version from terraform/schema.yaml"
+            exit 1
+          fi
+          if [ "$old" = "$new" ] || [ "$(printf '%s\n%s\n' "$old" "$new" | sort -V | tail -n 1)" != "$new" ]; then
+            echo "version: in terraform/schema.yaml must be bumped above ${old:-none} (found ${new})."
+            exit 1
+          fi
+          echo "Version bumped: ${old:-none} -> ${new}"
+
   release:
     runs-on: ubuntu-latest
+    # github.ref must be main -- push is already restricted to main by the trigger above, but
+    # workflow_dispatch isn't, so without this a manual dispatch from a feature branch could
+    # create a release from unmerged code.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     permissions:
       # Required to create tags and releases
       contents: write
@@ -21,7 +61,14 @@ jobs:
 
       - name: Read version
         id: version
-        run: echo "value=$(tr -d '[:space:]' < terraform/VERSION)" >> "$GITHUB_OUTPUT"
+        run: |
+          # The template version is the top-level `version:` in schema.yaml
+          version="$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' terraform/schema.yaml)"
+          if [ -z "$version" ]; then
+            echo "Could not read the template version from terraform/schema.yaml"
+            exit 1
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
 
       - name: Check if release already exists
         id: check
@@ -50,7 +97,10 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.value }}
           name: "oci-log-integration ${{ steps.version.outputs.value }}"
-          body: "Static release of the OCI Log Integration Terraform module."
+          body: |
+            Static release of the OCI Log Integration Terraform module (ORM template).
+
+            The function image is versioned and released separately (`function-<version>` releases). See the compatibility table in the README for the minimum function version this template needs.
           files: oci-log-integration.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
