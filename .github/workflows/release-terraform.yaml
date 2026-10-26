@@ -47,7 +47,10 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
+    # github.ref must be main -- push is already restricted to main by the trigger above, but
+    # workflow_dispatch isn't, so without this a manual dispatch from a feature branch could
+    # create a release from unmerged code.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     permissions:
       # Required to create tags and releases
       contents: write
