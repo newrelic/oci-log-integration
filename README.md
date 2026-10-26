@@ -27,8 +27,26 @@ The log-forwarder function image is published to Docker Hub (`docker.io/newrelic
 
 This means **the machine running `apply` needs outbound network access to Docker Hub** (`registry-1.docker.io` and `auth.docker.io`) **and to your own tenancy's Container Registry** (`<region>.ocir.io`), in addition to the OCI API endpoints the stack already requires. Docker Hub also redirects actual blob downloads to a separate storage host that varies and isn't one Docker Hub publishes as a fixed hostname — if your environment allow-lists by exact host rather than general HTTPS egress, expect to add that host once you see it in a run, rather than assuming `registry-1.docker.io` alone covers blob transfer.
 
-**Versioning:** the `function_image` variable defaults to the `:latest` tag. Re-applying the stack checks what image that tag currently points to and copies the new one if it's changed, so you'll pick up new releases automatically on your next `apply` without any action. To control exactly when you upgrade instead, pin `function_image` to a specific version tag (e.g. `docker.io/newrelic/oci-log-forwarder:1.42`) — the stack will then only ever copy that pinned version, and upgrading becomes a deliberate change to that variable followed by `apply`.
+**Versioning:** the `function_image` variable defaults to the `:latest` tag. Re-applying the stack checks what image that tag currently points to and copies the new one if it's changed, so you'll pick up new releases automatically on your next `apply` without any action. Each release is also published under its version number, taken from [`logs-function/VERSION`](logs-function/VERSION) (starting at `1.3.0`). To control exactly when you upgrade instead, pin `function_image` to a specific version tag (e.g. `docker.io/newrelic/oci-log-forwarder:1.3.0`) — the stack will then only ever copy that pinned version, and upgrading becomes a deliberate change to that variable followed by `apply`.
 
+### Releases and compatibility
+
+The function and the Resource Manager (ORM) template are versioned and released independently.
+
+| Component | Version file | What is released | Release tag |
+|---|---|---|---|
+| Function (Go log forwarder) | [`logs-function/VERSION`](logs-function/VERSION) | Image pushed to Docker Hub as `<version>` and `latest` | `function-<version>` |
+| Template (ORM stack, `terraform/`) | `version:` in [`terraform/schema.yaml`](terraform/schema.yaml) | `oci-log-integration.zip` | `<version>` |
+
+* **Function:** any change under `logs-function/**` (other than tests) must bump `logs-function/VERSION`; CI fails the pull request otherwise. A `<version>` image tag is never overwritten once published, and `latest` moves only to the newest version on `main`.
+* **Template:** any change under `terraform/**` that ships to customers must bump `version:` in `terraform/schema.yaml`. That is the only place the template version is kept, and the release workflow reads it from there.
+* **Mapping:** the template's default `function_image` is `:latest`, so it never names a function version and the two need not be released together. When a template change needs a newer function or Terraform provider, record the minimum versions in the table below in the same pull request.
+
+| Template (ORM) version | Minimum function version | Minimum Terraform provider version (`terraform-provider-newrelic`) | Notes |
+|---|---|---|---|
+| 1.3.0 | any (`latest`) | v3.99.2 | Current template. Copies the function image from Docker Hub into your own Container Registry (`function_image`); `image_version` is deprecated. v3.99.2 is the first provider release with `metrics_tier`. |
+
+There is no backward compatibility: past releases are not given versions. Versioning starts with function `1.3.0`; earlier builds were published as `latest` only and cannot be pinned.
 
 ## Contributing
 
