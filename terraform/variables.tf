@@ -86,6 +86,12 @@ variable "registry_auth_token" {
   description = "Existing auth token for pushing to Container Registry. Leave empty to have the stack create one for the user running it (OCI allows two auth tokens per user)."
 }
 
+variable "existing_container_repository_id" {
+  type        = string
+  default     = ""
+  description = "OCID of an existing Container Registry repository to use instead of creating one. Leave empty to have the stack create one. Set this if the stack's own create fails with 409-NAMESPACE_CONFLICT -- OCIR repository names are unique tenancy+region-wide, not per compartment, so a repository from a prior deployment anywhere in the tenancy+region can collide on the default name (see NR-640865). Must be the OCID of a repository whose own display_name already matches this stack's computed name (newrelic-<newrelic_logging_identifier>/oci-log-forwarder) -- this is for reusing the repository that already has this exact name, not for pointing at an arbitrary, differently-named one."
+}
+
 variable "metrics_tier" {
   type        = string
   default     = "basic"

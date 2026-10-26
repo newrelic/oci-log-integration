@@ -31,14 +31,19 @@ locals {
 
   # The function runs from a copy of var.function_image in the tenancy's own Container
   # Registry, not from New Relic's own OCIR (the old image_url path this replaces).
-  ocir_host                 = "${var.region}.ocir.io"
-  ocir_namespace            = oci_artifacts_container_repository.log_forwarder_repo.namespace
+  ocir_host = "${var.region}.ocir.io"
+  ocir_namespace = local.create_container_repository ? (
+    oci_artifacts_container_repository.log_forwarder_repo[0].namespace
+    ) : (
+    data.oci_artifacts_container_repository.existing[0].namespace
+  )
   function_image_repository = "newrelic-${var.newrelic_logging_identifier}/oci-log-forwarder"
   function_image_digest     = data.external.function_image.result.digest
   function_image            = "${local.ocir_host}/${local.ocir_namespace}/${local.function_image_repository}:${data.external.function_image.result.tag}"
 
   # nonsensitive() here is safe: this only reveals whether the token string was empty, never
   # the token itself. It's required because count/for_each reject sensitive values outright.
+  create_container_repository     = nonsensitive(var.existing_container_repository_id == "")
   create_registry_token           = nonsensitive(var.registry_auth_token == "")
   registry_push_token_description = "New Relic logs stack: pushes the function image to ${local.function_image_repository} in ${var.region}"
   # data.oci_identity_auth_tokens.existing is re-read on every plan, so once this stack has
