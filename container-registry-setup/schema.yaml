@@ -1,0 +1,45 @@
+---
+title: "New Relic OCI Container Registry Setup"
+description: >
+  Creates the private Container Registry repository the New Relic OCI log-forwarder
+  function's image is mirrored into. Run this once per region before the main
+  "New Relic Log Integration for OCI" stack -- OCIR repository names are unique
+  tenancy+region-wide, not per compartment, so this is a one-time setup step, not
+  something each logs-function deployment creates for itself.
+schemaVersion: 1.1.0
+version: "1.0.0"
+locale: "en"
+variableGroups:
+  - title: "New Relic Environment Configuration"
+    visible: true
+    variables:
+      - ${newrelic_logging_identifier}
+
+variables:
+  tenancy_ocid:
+    type: string
+    title: "Tenancy OCID"
+    description: "OCI tenant OCID, more details can be found at https://docs.cloud.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#five"
+    required: true
+    visible: false
+
+  compartment_ocid:
+    type: string
+    title: Compartment OCID
+    description: The OCID of the compartment where the repository will be created.
+    required: true
+    visible: false
+
+  region:
+    type: string
+    title: "Region"
+    description: "OCI Region as documented at https://docs.cloud.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm"
+    required: true
+    visible: false
+
+  newrelic_logging_identifier:
+    type: string
+    title: New Relic logging prefix
+    description: A unique label or name identifier matching the one used in the logs-function stack. Leave it blank if not needed.
+    required: true
+    default: logs
