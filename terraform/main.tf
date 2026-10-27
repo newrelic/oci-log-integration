@@ -70,13 +70,6 @@ resource "oci_logging_log" "function_execution_log" {
   freeform_tags = local.freeform_tags
 }
 
-resource "oci_artifacts_container_repository" "log_forwarder_repo" {
-  compartment_id = local.compartment_ocid
-  display_name   = local.function_image_repository
-  is_public      = false
-  freeform_tags  = local.freeform_tags
-}
-
 resource "oci_identity_auth_token" "registry_push" {
   count       = local.create_registry_token ? 1 : 0
   provider    = oci.home_provider
