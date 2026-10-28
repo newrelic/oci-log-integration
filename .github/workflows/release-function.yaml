@@ -204,6 +204,18 @@ jobs:
           PUSH_LATEST: ${{ env.PUSH_LATEST }}
           REQUIRE_NEW_VERSION: ${{ env.REQUIRE_NEW_VERSION }}
 
+      # Keeps the Docker Hub repository's "Overview" page in sync with this repo's
+      # README -- without this, the Docker Hub page is blank for anyone pulling the
+      # image directly instead of going through the Terraform stack.
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: newrelic/oci-log-forwarder
+          short-description: "Forwards OCI logs to New Relic via OCI Functions and Service Connector Hub."
+          enable-url-completion: true
+
       # SLC-recommended digest pinning (SLCREV-1730): the released stack should ship
       # pinned to the exact image this run just pushed, not a floating :latest tag.
       # Only on real pushes to main -- not on a manual workflow_dispatch test run --
