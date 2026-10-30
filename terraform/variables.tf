@@ -63,7 +63,7 @@ variable "image_version" {
 
 variable "function_image" {
   type        = string
-  default     = "docker.io/newrelic/oci-log-forwarder:latest"
+  default     = "docker.io/newrelic/oci-log-forwarder@sha256:efcd146139b4b0c8630944f0f1c757a4d5c4754ac8ff9358ea6d70953e05cbdd"
   description = "Public image for the log-forwarder function. The stack copies it into a private Container Registry repository in your tenancy and runs the function from there. The default is pinned to the digest published with this release (not a floating tag) -- upgrading to a newer release of this module is what picks up a new image, not re-applying the same one."
 }
 
