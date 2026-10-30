@@ -55,7 +55,7 @@ jobs:
     steps:
 
       - name: Checkout code
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@v7
 
       - name: Set permissions for build script
         run: chmod +x scripts/build_image.sh
@@ -113,7 +113,7 @@ jobs:
     steps:
 
       - name: Checkout code
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@v7
 
       - name: Set permissions for build script
         run: chmod +x scripts/build_and_push_image.sh
