@@ -8,6 +8,11 @@ variable "compartment_ocid" {
   description = "The OCID of the compartment where resources will be created. Do not modify."
 }
 
+variable "container_repository_id" {
+  type        = string
+  description = "OCID of the Container Registry repository the function image is mirrored into. Created by the separate \"New Relic OCI Container Registry Setup\" stack -- run that stack once per region first, then select its repository here. This stack no longer creates its own repository (OCIR repository names are unique tenancy+region-wide, not per compartment, so each deployment creating its own caused collisions; see NR-640865)."
+}
+
 variable "newrelic_logging_identifier" {
   type        = string
   description = "A unique label or name identifier for all resources in this deployment. Leave it blank if not needed."

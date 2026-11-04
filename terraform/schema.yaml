@@ -4,7 +4,7 @@ description: >
   Forward logs from OCI Log Groups to New Relic using OCI Functions
   and Service Connector Hub
 schemaVersion: 1.1.0
-version: "1.3.0"
+version: "1.4.0"
 locale: "en"
 variableGroups:
   - title: "New Relic Environment Configuration"
@@ -25,6 +25,7 @@ variableGroups:
 
   - title: "Function image"
     variables:
+      - ${container_repository_id}
       - ${function_image}
       - ${registry_username}
       - ${registry_auth_token}
@@ -102,6 +103,17 @@ variables:
     required: true
     default: latest
     visible: false
+
+  # TODO(NR-640865): verify this resource-picker type string against OCI Resource Manager's
+  # actual variable-type reference before release -- modeled on vcnCompartment/existingVcn
+  # below (oci:<service>:<resourceType>:id), not yet confirmed against a real ORM form.
+  container_repository_id:
+    type: oci:artifacts:containerrepository:id
+    title: Container Registry repository
+    description: Repository created by the separate "New Relic OCI Container Registry Setup" stack. Run that stack once per region before this one, then select its repository here.
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
 
   function_image:
     type: string

@@ -2,6 +2,13 @@ data "oci_identity_tenancy" "current_tenancy" {
   tenancy_id = var.tenancy_ocid
 }
 
+# Created by the separate container-registry-setup stack (NR-640865), not by this stack --
+# run that one once per region before this one. Reading it back here means this stack never
+# recomputes a name that could drift from what was really created.
+data "oci_artifacts_container_repository" "existing" {
+  repository_id = var.container_repository_id
+}
+
 # Human-readable name (not OCID) for the compartment this stack deploys into, so multiple
 # forwarders reporting into one New Relic account can be told apart in dashboards.
 #
