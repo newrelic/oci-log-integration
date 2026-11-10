@@ -31,6 +31,15 @@ data "oci_resourcemanager_stacks" "current_stack" {
     values = [".*oci-log-integration.*"]
     regex  = true
   }
+
+  # Without this, a non-matching stack name fails later with a raw "index out of range"
+  # error on stacks[0] that never mentions the name requirement. See NR-646563.
+  lifecycle {
+    postcondition {
+      condition     = length(self.stacks) > 0
+      error_message = "No Resource Manager stack found in this compartment with \"oci-log-integration\" in its name. This configuration looks itself up by that name to find its own stack ID -- rename the stack (on the OCI console's stack page, or via the OCI CLI) to include \"oci-log-integration\", then re-run plan/apply."
+    }
+  }
 }
 
 data "external" "connector_payload" {
