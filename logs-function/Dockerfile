@@ -16,10 +16,12 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o function main.go
 # Final stage: minimal image for OCI Functions
 FROM fnproject/go:1.24
 
-# Patch known HIGH-severity CVEs in the base image's OS packages (expat, libbrotli,
-# openssl, python3) -- fixes are already published upstream, fnproject's image just
-# hasn't picked them up yet. See Trivy Docker Image Scan findings on this PR.
-RUN microdnf update -y expat libbrotli openssl openssl-libs python3 python3-libs && microdnf clean all
+# Patch all OS packages in the base image -- fixes for known CVEs (expat, libbrotli,
+# openssl, python3, glibc, xz-libs, openssh, curl, ...) are already published upstream,
+# fnproject's image just hasn't picked them up yet. See Trivy Docker Image Scan
+# findings on this PR. Updating broadly (not a hand-picked list) so future CVEs in
+# other packages get patched here too instead of requiring another Dockerfile edit.
+RUN microdnf update -y && microdnf clean all
 
 WORKDIR /function
 
