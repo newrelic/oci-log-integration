@@ -37,7 +37,7 @@ data "oci_resourcemanager_stacks" "current_stack" {
   lifecycle {
     postcondition {
       condition     = length(self.stacks) > 0
-      error_message = "No Resource Manager stack found in this compartment with \"oci-log-integration\" in its name. This configuration looks itself up by that name to find its own stack ID -- rename the stack (on the OCI console's stack page, or via the OCI CLI) to include \"oci-log-integration\", then re-run plan/apply."
+      error_message = "No Resource Manager stack with \"oci-log-integration\" in its name was found in compartment \"${local.compartment_name}\". This configuration looks itself up by that name to find its own stack ID -- rename the stack (on the OCI console's stack page, or via the OCI CLI) to include \"oci-log-integration\", then re-run plan/apply."
     }
   }
 }
