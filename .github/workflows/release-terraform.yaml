@@ -97,6 +97,7 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.value }}
           name: "oci-log-integration ${{ steps.version.outputs.value }}"
+          make_latest: true
           body: |
             Static release of the OCI Log Integration Terraform module (ORM template).
 

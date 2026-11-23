@@ -302,6 +302,7 @@ jobs:
         with:
           tag_name: function-${{ steps.version.outputs.value }}
           name: "oci-log-forwarder function ${{ steps.version.outputs.value }}"
+          make_latest: false
           body: |
             OCI log forwarder function image, published to Docker Hub (`docker.io/newrelic/oci-log-forwarder`) as `${{ steps.version.outputs.value }}` and `latest`.
 
